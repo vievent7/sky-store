@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sky Store — Cartes du Ciel Personalisees</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/vendor/d3-celestial/celestial.css">
+  <style>
+    #home-celestial-sphere #celestial-zoomin,
+    #home-celestial-sphere #celestial-zoomout,
+    #home-celestial-sphere #d3-celestial-footer { display: none !important; }
+    #home-celestial-sphere { animation: sphereFadeIn 1.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) both; }
+    @keyframes sphereFadeIn {
+      from { opacity: 0; transform: scale(0.97); }
+      to   { opacity: 1; transform: scale(1); }
+    }
+  </style>
+  <!-- Constrain d3-celestial canvas to its container -->
+  <style>
+    #home-celestial-sphere #celestial-map {
+      width: 100% !important;
+      min-width: 0 !important;
+      height: 100% !important;
+      min-height: 0 !important;
+      position: relative !important;
+      overflow: hidden !important;
+    }
+    #home-celestial-sphere canvas,
+    #home-celestial-sphere svg {
+      width: 100% !important;
+      height: 100% !important;
+    }
+    @media (max-width: 900px) {
+      .home-hero { min-height: auto !important; }
+      .home-hero-grid {
+        grid-template-columns: 1fr !important;
+        gap: 24px !important;
+        min-height: auto !important;
+        padding: 56px 20px 44px !important;
+      }
+      .home-hero-sphere-wrap {
+        width: min(100%, 420px) !important;
+        height: auto !important;
+        aspect-ratio: 1 / 1 !important;
+        margin: 0 auto !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Navigation -->
+<nav class="navbar">
+  <div class="nav-inner">
+    <a href="/" class="logo"><img src="/images/sky-store-logo.jpg" alt="Sky Store logo" class="logo-mark">Sky Store
+    </a>
+    <button class="nav-toggle" onclick="document.querySelector('.nav-links').classList.toggle('open')">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+      </svg>
+    </button>
+    <div class="nav-links">
+      <a href="/" class="active">Accueil</a>
+      <a href="/choose-sky">Creer</a>
+      <a href="/gallery">Galerie</a>
+      <a href="/cart" id="nav-cart">Panier <span id="cart-count" class="badge"></span></a>
+      <a href="/account" id="nav-account">Mon compte</a>
+    </div>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="home-hero" style="position:relative;min-height:85vh;overflow:hidden;">
+  <!-- Fond -->
+  <div style="position:absolute;inset:0;background:linear-gradient(rgba(10,15,30,.55),rgba(10,15,30,.55)),url('/cielfond.jpg') center center / cover no-repeat;"></div>
+
+  <!-- Grille -->
+  <div class="home-hero-grid" style="position:relative;z-index:2;max-width:1100px;margin:0 auto;padding:80px 20px 60px;display:grid;grid-template-columns:1fr 594px;align-items:center;gap:40px;min-height:85vh;box-sizing:border-box;">
+
+    <!-- Texte gauche -->
+    <div>
+      <h1 style="font-family:var(--font-title);font-size:clamp(2rem,4vw,3.2rem);line-height:1.15;margin-bottom:16px">Votre ciel,<br><span style="color:var(--accent2)">a votre date exacte</span></h1>
+      <p style="font-size:1.1rem;max-width:480px;color:rgba(232,238,248,.8);margin-bottom:24px">Créez une carte du ciel personnalisée pour la nuit qui compte le plus pour vous. Naissance, rencontre, fiançailles ou moment inoubliable.</p>
+      <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:36px">
+        <a href="/choose-sky" class="btn btn-primary">Creer ma carte</a>
+        <a href="/gallery" class="btn btn-ghost">Voir la galerie</a>
+      </div>
+      <div style="display:flex;gap:36px;flex-wrap:wrap">
+        <div><div style="font-size:1.8rem;font-family:var(--font-title);color:var(--accent2);font-weight:600">3 000+</div><div style="font-size:.85rem;color:var(--text-muted)">Cartes creees</div></div>
+        <div><div style="font-size:1.8rem;font-family:var(--font-title);color:var(--accent2);font-weight:600">+50</div><div style="font-size:.85rem;color:var(--text-muted)">Photos astro</div></div>
+        <div><div style="font-size:1.8rem;font-family:var(--font-title);color:var(--accent2);font-weight:600">+1</div><div style="font-size:.85rem;color:var(--text-muted)">Photo gratuite</div></div>
+      </div>
+    </div>
+
+    <!-- Sphère droite -->
+    <div class="home-hero-sphere-wrap" style="position:relative;width:594px;height:594px;flex-shrink:0;background:transparent;border-radius:12px;border:1px solid rgba(74,144,217,.2);box-shadow:0 0 60px rgba(74,144,217,.1);overflow:hidden;">
+      <div id="home-celestial-sphere" style="position:absolute;inset:0;width:100%;height:100%;"></div>
+    </div>
+
+  </div>
+</section>
+
+<!-- Comment ca marche -->
+<section class="section section-dark">
+  <div class="container">
+    <h2 class="section-title">Comment ca marche</h2>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">01</div>
+        <h3>Choisissez votre nuit</h3>
+        <p>Entrez une date, une heure et un lieu. Nous calculons exactement quelles etoiles et constellations etaient visibles.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">02</div>
+        <h3>Personnalisez</h3>
+        <p>Ajoutez un titre et un sous-titre. Choisissez le style visuel qui vous plait.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">03</div>
+        <h3>Recevez +1 gratuite</h3>
+        <p>Pour chaque carte achetee, recevez une photo astrophotographie de votre choix. Offert.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Produit principal -->
+<section class="section">
+  <div class="container">
+    <div class="product-grid">
+      <div class="product-info">
+        <span class="tag">Carte du ciel</span>
+        <h2>L'artefact parfait pour immortaliser une nuit</h2>
+        <p>Une carte generate algorithmiquement depuis de vraies donnees astronomiques. Oriones, constellations, etoiles brillantes, planetes visibles, fidelement reproduites au plus proche de la realite.</p>
+        <ul class="feature-list">
+          <li>
+            <svg width="20" height="20" fill="none" stroke="#4a90d9" stroke-width="2"><polyline points="20,6 9,17 4,12"/></svg>
+            Coordonnees geographiques exactes
+          </li>
+          <li>
+            <svg width="20" height="20" fill="none" stroke="#4a90d9" stroke-width="2"><polyline points="20,6 9,17 4,12"/></svg>
+            Constellations et etoiles reales
+          </li>
+          <li>
+            <svg width="20" height="20" fill="none" stroke="#4a90d9" stroke-width="2"><polyline points="20,6 9,17 4,12"/></svg>
+            Format PDF haute resolution
+          </li>
+          <li>
+            <svg width="20" height="20" fill="none" stroke="#4a90d9" stroke-width="2"><polyline points="20,6 9,17 4,12"/></svg>
+            +1 photo astro gratuite avec chaque achat
+          </li>
+        </ul>
+        <a href="/choose-sky" class="btn btn-primary">Commencer maintenant</a>
+      </div>
+      <div class="product-preview" id="hero-preview">
+        <div class="preview-placeholder" style="aspect-ratio:568/862">
+          <img src="/images/example-card.png" alt="Exemple de carte Sky Store" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block">
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Galerie teasers -->
+<section class="section section-dark">
+  <div class="container">
+    <div class="section-header">
+      <h2 class="section-title">Photos astrophotographie</h2>
+      <a href="/gallery" class="btn btn-ghost">Voir toute la galerie</a>
+    </div>
+    <div class="photo-grid" id="home-photos">
+      <!-- Chargees dynamiquement -->
+    </div>
+  </div>
+</section>
+
+<!-- Bonus -->
+<section class="section bonus-section">
+  <div class="container">
+    <div class="bonus-card">
+      <div class="bonus-icon">
+        <svg width="60" height="60" viewBox="0 0 60 60" fill="none">
+          <circle cx="30" cy="30" r="28" stroke="#4a90d9" stroke-width="1.5" stroke-dasharray="4 2"/>
+          <path d="M20 30 L30 20 L40 30 L30 40 Z" fill="#4a90d9" opacity="0.3" stroke="#4a90d9" stroke-width="1.5"/>
+          <circle cx="30" cy="30" r="4" fill="#4a90d9"/>
+        </svg>
+      </div>
+      <div class="bonus-text">
+        <h2>1 photo astrophotographie offerte</h2>
+        <p>Pour chaque carte du ciel achetee, choisissez parmi notre galerie et recevez votre photo en haute resolution. Un cadeau qui ne cote rien de plus.</p>
+        <a href="/choose-sky" class="btn btn-primary">Creez votre carte + obtenez 1 photo gratuite</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer>
+  <div class="container footer-inner">
+    <div class="footer-brand">
+      <strong>Sky Store</strong>
+      <p>Vos cartes du ciel personnalisées</p>
+    </div>
+    <div class="footer-links">
+      <a href="/choose-sky">Creer ma carte</a>
+      <a href="/gallery">Galerie</a>
+      <a href="/cart">Panier</a>
+      <a href="/account">Mon compte</a>
+      <a href="/cgu">CGU</a>
+      <a href="/privacy">Confidentialité</a>
+    </div>
+    <div class="footer-legal">
+      <small>&copy; 2026 Sky Store. Tous droits réservés.</small>
+    </div>
+  </div>
+</footer>
+
+<script>
+    if (typeof window.getBoundingClientRect !== "function") {
+      window.getBoundingClientRect = function() {
+        return { width: window.innerWidth || 800, height: window.innerHeight || 600, top: 0, left: 0, right: window.innerWidth || 800, bottom: window.innerHeight || 600 };
+      };
+    }
+  </script>
+  <script src="/vendor/d3-lib/d3.min.js"></script>
+  <script src="/vendor/d3-celestial/celestial.min.js"></script>
+<script src="/js/app.js"></script>
+<script>
+  // Charger les photos de la galerie sur la page d'accueil
+  fetch('/api/photos')
+    .then(r => r.json())
+    .then(photos => {
+      const grid = document.getElementById('home-photos');
+      grid.innerHTML = photos.slice(0, 4).map(p => `
+        <div class="photo-card">
+          <div class="photo-thumb" style="background:linear-gradient(135deg,#0a0f1e,#1b2838)">
+            <img src="${p.thumbUrl}" alt="${p.title}" loading="lazy">
+          </div>
+          <div class="photo-info">
+            <strong>${p.title}</strong>
+            <span>${(p.price/100).toFixed(2)}$ CAD</span>
+          </div>
+        </div>
+      `).join('');
+    })
+    .catch(() => {});
+
+  // Apercu au survol sur le hero (exemple d'utilisation)
+  const heroPreview = document.getElementById('hero-preview');
+  heroPreview.addEventListener('click', () => window.location.href = '/choose-sky');
+
+  // ============================================================
+  // HOME PAGE CELESTIAL SPHERE
+  // ============================================================
+  (function initHomeSphere() {
+    var sphereEl = document.getElementById('home-celestial-sphere');
+    if (!sphereEl) return;
+
+    function waitForD3(timeout) {
+      return new Promise(function(resolve, reject) {
+        var start = Date.now();
+        function check() {
+          if (window.d3) return resolve();
+          if (Date.now() - start > timeout) return reject(new Error('d3 timeout'));
+          setTimeout(check, 50);
+        }
+        check();
+      });
+    }
+
+    function waitForCelestial(timeout) {
+      return new Promise(function(resolve, reject) {
+        var start = Date.now();
+        function check() {
+          if (window.Celestial && window.Celestial.display) return resolve();
+          if (Date.now() - start > timeout) return reject(new Error('Celestial timeout'));
+          setTimeout(check, 50);
+        }
+        check();
+      });
+    }
+
+    function getConfig(w, h) {
+      return {
+        canvaswidth: 594,
+        canvasheight: 594,
+          container: "home-celestial-sphere",
+          datapath: '/vendor/d3-celestial/data/',
+        projection: 'orthographic',
+        transform: 'equatorial',
+        center: [0, 0],
+        lang: 'fr',
+        controls: true,
+        interactive: true,
+        stars: {
+          show: true,
+          limit: 4.5,
+          colors: true,
+          style: { fill: '#ffffff', opacity: 0.75 },
+          proper: true,
+          names: false,
+          namelimit: 2.5,
+          size: 9,
+          symbols: { star: { fill: '#ffffff' } },
+          data: 'stars.6.json'
+        },
+        constellations: {
+          show: true,
+          names: false,
+          desig: false,
+          lines: true,
+          linestyle: { stroke: '#c8a84b', width: 0.8, opacity: 0.5 },
+          bounds: false
+        },
+        dsos: { show: false },
+        lines: {
+          graticule: { show: false },
+          equatorial: { show: false },
+          ecliptic: { show: true, stroke: '#c8a84b', width: 0.8, opacity: 0.5 }
+        },
+        mw: {
+          show: true,
+          style: { fill: '#1a3a6b', opacity: 0.5 }
+          },
+          rendered: function() {
+            var canvas = document.querySelector('#home-celestial-sphere canvas');
+            if (!canvas) return;
+            var ctx = canvas.getContext('2d');
+            if (!ctx) return;
+            var cx = canvas.width / 2, cy = canvas.height / 2;
+            var r = canvas.width * 0.44;
+            var grad = ctx.createRadialGradient(cx, cy, r * 0.5, cx, cy, r);
+            grad.addColorStop(0, 'rgba(150, 190, 255, 0)');
+            grad.addColorStop(0.7, 'rgba(120, 160, 255, 0.06)');
+            grad.addColorStop(1, 'rgba(80, 120, 200, 0)');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+          }
+        };
+      }
+
+    function renderSphere() {
+      var w = 594; var h = 594;
+      console.log('[HomeSphere] Rendering at', w, 'x', h);
+      Celestial.display(getConfig(w, h));
+    }
+
+    function playIntro() {
+      // Intro: gentle rotation from -60deg to 0
+      var introSteps = 35;
+      var currentStep = 0;
+      var startLng = -60;
+      var endLng = 0;
+      var introInterval = setInterval(function() {
+        currentStep++;
+        var t = currentStep / introSteps;
+        var ease = 1 - Math.pow(1 - t, 3);
+        var lng = startLng + (endLng - startLng) * ease;
+        try {
+          Celestial.display(getConfig(400, 400));
+        } catch(e) {}
+        if (currentStep >= introSteps) {
+          clearInterval(introInterval);
+        }
+      }, 70);
+    }
+
+    (async function() {
+      try {
+        await waitForD3(5000);
+        await waitForCelestial(5000);
+        // Wait for layout to settle
+        await new Promise(function(r) { setTimeout(r, 200); });
+        renderSphere();
+      } catch(e) {
+        console.warn('[HomeSphere] Init failed:', e.message);
+      }
+    })();
+  })();
+</script>
+</body>
+</html>
+
+
+
+

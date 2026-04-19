@@ -1,0 +1,5 @@
+[Database] sql.js initialise, pret
+=== Test INSERT ===
+INSERT result: { lastInsertRowid: 0, changes: 0 }
+lastInsertRowid: 0
+changes: 0

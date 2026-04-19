@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Celestial Sphere — Reserve Copy</title>
+  <script src="/d3-lib/d3.min.js"></script>
+  <script src="/celestial/celestial.min.js"></script>
+  <link rel="stylesheet" href="/celestial/celestial.css">
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #010810;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      font-family: Arial, sans-serif;
+      color: #aaccff;
+    }
+    #celestial-map {
+      width: min(70vw, 800px);
+      height: min(70vh, 700px);
+      background: radial-gradient(ellipse at center, #050d20 0%, #010810 100%);
+      border-radius: 8px;
+      overflow: hidden;
+      cursor: grab;
+    }
+    #celestial-map:active { cursor: grabbing; }
+    #controls {
+      margin-top: 16px;
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .ctrl-btn {
+      background: rgba(74, 144, 217, 0.15);
+      border: 1px solid rgba(74, 144, 217, 0.4);
+      color: #aaccff;
+      padding: 8px 18px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: background 0.2s;
+    }
+    .ctrl-btn:hover { background: rgba(74, 144, 217, 0.3); }
+    #log {
+      position: fixed;
+      bottom: 10px;
+      left: 10px;
+      color: #0f0;
+      font: 11px monospace;
+      background: rgba(0,0,0,0.85);
+      padding: 8px 12px;
+      border-radius: 4px;
+      max-height: 100px;
+      overflow-y: auto;
+      display: none;
+    }
+    #log span { display: block; }
+    .ok { color: #4f8; }
+    .err { color: #f55; }
+    #info {
+      position: fixed;
+      top: 12px;
+      right: 14px;
+      font-size: 0.72rem;
+      color: rgba(170, 204, 255, 0.45);
+      text-align: right;
+      line-height: 1.7;
+    }
+    #title {
+      font-size: 1.1rem;
+      font-weight: bold;
+      color: #c8ddf5;
+      margin-bottom: 14px;
+      letter-spacing: 0.04em;
+    }
+    #hint {
+      margin-top: 10px;
+      font-size: 0.78rem;
+      color: rgba(170, 204, 255, 0.4);
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="title">Sph&#232;re C&#233;leste — Reserve</div>
+  <div id="celestial-map"></div>
+  <div id="hint">
+    Clic gauche + glisser : rotation &nbsp;|&nbsp; Roulette : zoom &nbsp;|&nbsp; Clic droit + glisser : d&#233;placer
+  </div>
+
+  <div id="controls">
+    <button class="ctrl-btn" onclick="resetView()">Vue par d&#233;faut</button>
+    <button class="ctrl-btn" onclick="toggleConstellations()">Afficher/Masquer constellations</button>
+    <button class="ctrl-btn" onclick="toggleMW()">Afficher/Masquer Voie lact&#233;e</button>
+    <button class="ctrl-btn" onclick="toggleEcliptic()">Afficher/Masquer &#233;cliptique</button>
+    <button class="ctrl-btn" onclick="toggleLog()">Afficher/Masquer log</button>
+  </div>
+
+  <div id="log"></div>
+  <div id="info">
+    D3-Celestial v<span id="ver">?</span><br>
+    Rotation &amp; zoom via Souris<br>
+    Fichiers locaux embarqu&#233;s
+  </div>
+
+  <script>
+    var currentConfig;
+    var showConst = true;
+    var showMW = true;
+    var showEcl = true;
+    var logVisible = false;
+
+    function log(msg, type) {
+      var el = document.createElement('span');
+      el.textContent = (type === 'err' ? '✗ ' : '✓ ') + msg;
+      el.className = type || 'ok';
+      document.getElementById('log').appendChild(el);
+      console.log((type === 'err' ? '[ERR]' : '[OK]'), msg);
+    }
+
+    function waitForD3(timeout) {
+      return new Promise(function(resolve, reject) {
+        var start = Date.now();
+        function check() {
+          if (window.d3) return resolve();
+          if (Date.now() - start > timeout) return reject(new Error('d3 timeout'));
+          setTimeout(check, 50);
+        }
+        check();
+      });
+    }
+
+    function waitForCelestial(timeout) {
+      return new Promise(function(resolve, reject) {
+        var start = Date.now();
+        function check() {
+          if (window.Celestial && window.Celestial.display) return resolve();
+          if (Date.now() - start > timeout) return reject(new Error('Celestial timeout'));
+          setTimeout(check, 50);
+        }
+        check();
+      });
+    }
+
+    function getConfig() {
+      return {
+        canvaswidth: Math.min(window.innerWidth * 0.7, 800),
+        canvasheight: Math.min(window.innerHeight * 0.7, 700),
+        datapath: '/celestial/data/',
+        projection: 'orthographic',
+        transform: 'equatorial',
+        center: [0, 0],
+        lang: 'en',
+
+        controls: true,
+        interactive: true,
+
+        stars: {
+          show: true,
+          limit: 5.5,
+          colors: true,
+          style: { fill: '#ffffff', opacity: 1 },
+          proper: true,
+          names: false,
+          namelimit: 2.5,
+          size: 8,
+          symbols: { star: { fill: '#ffffff' } },
+          data: 'stars.6.json'
+        },
+
+        constellations: {
+          show: showConst,
+          names: false,
+          desig: false,
+          lines: true,
+          linestyle: { stroke: '#c8a84b', width: 0.8, opacity: 0.4 },
+          bounds: false
+        },
+
+        dsos: { show: false },
+
+        lines: {
+          graticule: { show: false },
+          equatorial: { show: false },
+          ecliptic: { show: showEcl, stroke: '#c8a84b', width: 0.8, opacity: 0.35 }
+        },
+
+        mw: {
+          show: showMW,
+          style: { fill: '#1a3a6b', opacity: 0.4 }
+        }
+      };
+    }
+
+    function render() {
+      currentConfig = getConfig();
+      Celestial.display(currentConfig);
+      log('Sphere rendered', 'ok');
+      var canvas = document.querySelector('#celestial-map canvas') || document.querySelector('#celestial-map svg');
+      if (canvas) {
+        log('Canvas: ' + canvas.nodeName + ' ' + canvas.width + 'x' + canvas.height, 'ok');
+      }
+    }
+
+    function resetView() {
+      render();
+      log('Vue r\u00e9initialis\u00e9e', 'ok');
+    }
+
+    function toggleConstellations() {
+      showConst = !showConst;
+      render();
+      log('Constellations: ' + (showConst ? 'ON' : 'OFF'), 'ok');
+    }
+
+    function toggleMW() {
+      showMW = !showMW;
+      render();
+      log('Voie lact\u00e9e: ' + (showMW ? 'ON' : 'OFF'), 'ok');
+    }
+
+    function toggleEcliptic() {
+      showEcl = !showEcl;
+      render();
+      log('\u00c9cliptique: ' + (showEcl ? 'ON' : 'OFF'), 'ok');
+    }
+
+    function toggleLog() {
+      logVisible = !logVisible;
+      document.getElementById('log').style.display = logVisible ? 'block' : 'none';
+    }
+
+    (async function init() {
+      try {
+        await waitForD3(5000);
+        log('d3 charg\u00e9: v' + d3.version, 'ok');
+        document.getElementById('ver').textContent = Celestial.version || '?';
+
+        await waitForCelestial(5000);
+        log('Celestial charg\u00e9: ' + Celestial.version, 'ok');
+
+        render();
+
+      } catch(e) {
+        log('ERREUR: ' + e.message, 'err');
+        console.error(e);
+      }
+    })();
+  </script>
+</body>
+</html>

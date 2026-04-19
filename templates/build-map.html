@@ -1,0 +1,1011 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Construire votre carte — Sky Store</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Marcellus&family=Montserrat:wght@300;400;500&family=Lora:ital,wght@0,400;0,600;1,400&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+  <style>
+    body { min-height: 100vh; }
+    .build-layout {
+      max-width: 1150px;
+      margin: 0 auto;
+      padding: 60px 20px;
+    }
+    .build-top {
+      display: flex;
+      gap: 32px;
+      align-items: flex-start;
+      margin-bottom: 40px;
+    }
+    .capture-preview {
+      flex-shrink: 0;
+      width: 300px;
+      height: 300px;
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border);
+      overflow: hidden;
+      background: var(--bg2);
+    }
+    .capture-preview img { width: 100%; height: 100%; object-fit: cover; }
+    .build-info h1 { font-family: var(--font-title); font-size: 1.8rem; margin-bottom: 8px; }
+    .build-info p { font-size: .9rem; color: var(--text-muted); margin-bottom: 20px; }
+    .build-info .btn-secondary {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 10px 20px; background: rgba(255,255,255,.07);
+      border: 1px solid var(--border); border-radius: var(--radius);
+      color: var(--text); font-size: .9rem; font-weight: 500;
+      text-decoration: none; transition: all .2s;
+    }
+    .build-info .btn-secondary:hover { background: rgba(255,255,255,.12); color: white; }
+    .build-info .btn-secondary svg { flex-shrink: 0; }
+    .build-grid { display: grid; grid-template-columns: 360px minmax(0, 1fr); gap: 34px; align-items: stretch; }
+    .build-form-panel {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); padding: 28px 24px; height: 100%;
+    }
+    .build-form-panel h2 { font-family: var(--font-title); font-size: 1.3rem; margin-bottom: 20px; }
+    .form-group { margin-bottom: 20px; }
+    .form-group label {
+      display: block; font-size: .78rem; font-weight: 600;
+      color: var(--text-muted); margin-bottom: 8px;
+      letter-spacing: .04em; text-transform: uppercase;
+    }
+    .form-group input, .form-group select {
+      width: 100%; padding: 10px 14px; background: var(--bg2);
+      border: 1px solid var(--border); border-radius: var(--radius);
+      color: var(--text); font-size: .95rem; font-family: var(--font-main);
+      box-sizing: border-box; transition: border-color .2s;
+    }
+    .form-group input:focus, .form-group select:focus { outline: none; border-color: var(--accent); }
+    .style-picker { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .style-option {
+      border: 2px solid var(--border); border-radius: var(--radius);
+      padding: 14px 10px; text-align: center; cursor: pointer;
+      transition: all .2s; background: var(--bg2);
+    }
+    .style-option.selected { border-color: var(--accent); background: rgba(74,144,217,.1); }
+    .style-option input { display: none; }
+    .style-swatch { width: 48px; height: 48px; border-radius: 50%; margin: 0 auto 6px; }
+    .orientation-picker { display: flex; gap: 10px; }
+    .orientation-option {
+      flex: 1; padding: 12px; border: 2px solid var(--border);
+      border-radius: var(--radius); text-align: center; cursor: pointer;
+      font-size: .85rem; color: var(--text-muted); transition: all .2s; background: var(--bg2);
+    }
+    .orientation-option.selected { border-color: var(--accent); background: rgba(74,144,217,.1); color: var(--text); }
+    .orientation-option input { display: none; }
+    /* Font pickers */
+    .font-picker { display: flex; flex-direction: column; gap: 6px; }
+    .font-option {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 12px; border: 2px solid var(--border);
+      border-radius: var(--radius); cursor: pointer;
+      transition: all .15s; background: var(--bg2);
+    }
+    .font-option:hover { border-color: rgba(74,144,217,.5); }
+    .font-option.selected { border-color: var(--accent); background: rgba(74,144,217,.1); }
+    .font-option input { display: none; }
+    .font-option .font-swatch {
+      width: 28px; height: 18px; border-radius: 3px;
+      background: rgba(255,255,255,.06); flex-shrink: 0;
+    }
+    .font-option .font-name { font-size: .82rem; color: var(--text); }
+    .btn-primary-full {
+      width: 100%; padding: 13px; background: var(--accent); color: white;
+      border: none; border-radius: var(--radius); font-size: 1rem;
+      font-weight: 600; font-family: var(--font-main); cursor: pointer;
+      transition: background .2s, transform .1s; margin-top: 8px;
+    }
+    .btn-primary-full:hover { background: #5a9fe8; transform: translateY(-1px); }
+    .build-preview-area {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); padding: 24px; text-align: center; height: 100%;
+    }
+    .build-preview-area.is-vertical {
+      margin-top: 10px;
+      min-height: 780px;
+    }
+    .build-preview-area h2 { font-family: var(--font-title); font-size: 1.2rem; margin-bottom: 16px; }
+    #build-preview-content { min-height: 530px; }
+    .build-preview-placeholder {
+      background: var(--bg2); border: 1px dashed var(--border); border-radius: var(--radius);
+      min-height: 200px; display: flex; align-items: center; justify-content: center;
+      color: var(--text-muted); font-size: .9rem;
+    }
+    /* Background picker */
+    .bg-gallery-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-top: 8px;
+    }
+    .bg-gallery-col {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .bg-gallery-col-label {
+      font-size: .7rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      letter-spacing: .05em;
+      text-transform: uppercase;
+      padding-bottom: 4px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 2px;
+    }
+    .bg-gallery-scroll {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      max-height: 176px;
+      overflow-y: auto;
+      padding: 4px;
+    }
+    .bg-gallery-scroll::-webkit-scrollbar { width: 4px; }
+    .bg-gallery-scroll::-webkit-scrollbar-track { background: var(--bg2); border-radius: 2px; }
+    .bg-gallery-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+    .bg-option {
+      display: flex; flex-direction: column; align-items: center; gap: 4px;
+      cursor: pointer; transition: all .15s;
+    }
+    .bg-option:hover { transform: scale(1.05); }
+    .bg-option.selected .bg-option-inner { outline: 2px solid var(--accent); outline-offset: 1px; }
+    .bg-option .bg-option-inner {
+      width: 52px; height: 38px; border-radius: 6px; overflow: hidden;
+      border: 1px solid rgba(255,255,255,.1);
+      background-size: cover; background-position: center;
+    }
+    .bg-option span { font-size: .65rem; color: var(--text-muted); }
+    .bg-none-thumb {
+      background: linear-gradient(135deg,#0a0f1e,#1b2838);
+      display: flex; align-items: center; justify-content: center;
+    }
+    @media (max-width: 980px) {
+      .build-layout { padding: 32px 14px; }
+      .build-top {
+        flex-direction: column;
+        gap: 16px;
+        margin-bottom: 24px;
+      }
+      .capture-preview {
+        width: min(100%, 300px);
+        height: auto;
+        aspect-ratio: 1 / 1;
+      }
+      .build-grid {
+        grid-template-columns: 1fr;
+        gap: 20px;
+      }
+      .build-form-panel, .build-preview-area { height: auto; }
+      .build-preview-area.is-vertical { min-height: 0; margin-top: 0; }
+      #build-preview-content { min-height: 360px; }
+      .bg-gallery-grid { grid-template-columns: 1fr; }
+      .bg-gallery-scroll { max-height: 220px; }
+    }
+  </style>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="nav-inner">
+    <a href="/" class="logo"><img src="/images/sky-store-logo.jpg" alt="Sky Store logo" class="logo-mark">Sky Store
+    </a>
+    <button class="nav-toggle" onclick="document.querySelector('.nav-links').classList.toggle('open')">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+      </svg>
+    </button>
+    <div class="nav-links">
+      <a href="/">Accueil</a>
+      <a href="/choose-sky">Choisir le ciel</a>
+      <a href="/build-map">Construire</a>
+      <a href="/gallery">Galerie</a>
+      <a href="/cart">Panier <span id="cart-count" class="badge"></span></a>
+    </div>
+  </div>
+</nav>
+
+<div class="build-layout">
+  <div class="build-top">
+    <div class="capture-preview" id="capture-preview"></div>
+    <div class="build-info">
+      <div class="step-badge" style="display:inline-flex;align-items:center;gap:8px;background:rgba(74,144,217,.12);border:1px solid rgba(74,144,217,.25);color:var(--accent2);padding:6px 14px;border-radius:20px;font-size:.78rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase;margin-bottom:12px">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
+        Etape 2 sur 3
+      </div>
+      <h1>Construisez votre carte</h1>
+      <p>Votre ciel capture est en haut a gauche. Personnalisez ci-dessous.</p>
+      <a href="/choose-sky" class="btn-secondary">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+        Changer le ciel
+      </a>
+    </div>
+  </div>
+
+  <div class="build-grid">
+    <div class="build-form-panel">
+      <h2>Personnalisation</h2>
+
+      <div class="form-group">
+        <label for="build-title">Titre</label>
+        <input type="text" id="build-title" placeholder="Ex: Notre nuit sous les etoiles" maxlength="60">
+      </div>
+
+      <div class="form-group">
+        <label for="build-subtitle">Sous-titre</label>
+        <input type="text" id="build-subtitle" placeholder="Ex: 15 aout 2023, Lac Brome" maxlength="80">
+      </div>
+
+      <div class="form-group">
+        <label>Style visuel</label>
+        <div class="style-picker">
+          <label class="style-option selected">
+            <input type="radio" name="build-style" value="dark" checked>
+            <div class="style-swatch" style="background:linear-gradient(135deg,#0a0f1e,#1b2838)"></div>
+            <div style="font-size:.75rem">Sombre</div>
+          </label>
+          <label class="style-option">
+            <input type="radio" name="build-style" value="light">
+            <div class="style-swatch" style="background:linear-gradient(135deg,#faf8f2,#f0ece0)"></div>
+            <div style="font-size:.75rem">Clair</div>
+          </label>
+          <label class="style-option">
+            <input type="radio" name="build-style" value="art">
+            <div class="style-swatch" style="background:linear-gradient(135deg,#0d1b2a,#1a0a2e)"></div>
+            <div style="font-size:.75rem">Artistique</div>
+          </label>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Police du titre</label>
+        <div class="font-picker" id="title-font-picker">
+          <label class="font-option selected" data-font="Cinzel">
+            <input type="radio" name="title-font" value="Cinzel" checked>
+            <div class="font-swatch"></div>
+            <span class="font-name" style="font-family:'Cinzel',serif">Cinzel</span>
+          </label>
+          <label class="font-option" data-font="Playfair Display">
+            <input type="radio" name="title-font" value="Playfair Display">
+            <div class="font-swatch"></div>
+            <span class="font-name" style="font-family:'Playfair Display',serif">Playfair Display</span>
+          </label>
+          <label class="font-option" data-font="Cormorant Garamond">
+            <input type="radio" name="title-font" value="Cormorant Garamond">
+            <div class="font-swatch"></div>
+            <span class="font-name" style="font-family:'Cormorant Garamond',serif">Cormorant Garamond</span>
+          </label>
+          <label class="font-option" data-font="Marcellus">
+            <input type="radio" name="title-font" value="Marcellus">
+            <div class="font-swatch"></div>
+            <span class="font-name" style="font-family:'Marcellus',serif">Marcellus</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Police du sous-titre</label>
+        <div class="font-picker" id="subtitle-font-picker">
+          <label class="font-option selected" data-font="Montserrat">
+            <input type="radio" name="subtitle-font" value="Montserrat" checked>
+            <div class="font-swatch"></div>
+            <span class="font-name" style="font-family:'Montserrat',sans-serif;font-weight:300">Montserrat</span>
+          </label>
+          <label class="font-option" data-font="Lora">
+            <input type="radio" name="subtitle-font" value="Lora">
+            <div class="font-swatch"></div>
+            <span class="font-name" style="font-family:'Lora',serif;font-style:italic">Lora</span>
+          </label>
+          <label class="font-option" data-font="Libre Baskerville">
+            <input type="radio" name="subtitle-font" value="Libre Baskerville">
+            <div class="font-swatch"></div>
+            <span class="font-name" style="font-family:'Libre Baskerville',serif">Libre Baskerville</span>
+          </label>
+          <label class="font-option" data-font="Cormorant">
+            <input type="radio" name="subtitle-font" value="Cormorant">
+            <div class="font-swatch"></div>
+            <span class="font-name" style="font-family:'Cormorant Garamond',serif;font-style:italic">Cormorant</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Orientation</label>
+        <div class="orientation-picker">
+          <label class="orientation-option selected">
+            <input type="radio" name="build-orientation" value="vertical" checked>
+            <svg width="24" height="32" viewBox="0 0 24 32" fill="none" stroke="currentColor" stroke-width="1.5" style="margin:0 auto 4px;display:block"><rect x="3" y="2" width="18" height="28" rx="2"/></svg>
+            Vertical
+          </label>
+          <label class="orientation-option">
+            <input type="radio" name="build-orientation" value="horizontal">
+            <svg width="32" height="24" viewBox="0 0 32 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin:0 auto 4px;display:block"><rect x="2" y="3" width="28" height="18" rx="2"/></svg>
+            Horizontal
+          </label>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="build-preview-area">
+      <h2>Apercu de votre carte</h2>
+      <div id="build-preview-content">
+        L'apercu apparaitra ici automatiquement.
+      </div>
+      <div id="text-size-controls" style="margin-top:24px;padding-top:20px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:12px;">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <label style="font-size:.75rem;font-weight:600;color:var(--text-muted);min-width:120px;letter-spacing:.03em;">Titre</label>
+          <input type="range" id="title-size" min="50" max="180" value="100" step="5" style="flex:1;cursor:pointer;accent-color:var(--accent)">
+          <span id="title-size-val" style="font-size:.75rem;color:var(--accent2);min-width:36px;text-align:right;font-weight:600;">100%</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <label style="font-size:.75rem;font-weight:600;color:var(--text-muted);min-width:120px;letter-spacing:.03em;">Sous-titre</label>
+          <input type="range" id="subtitle-size" min="50" max="180" value="100" step="5" style="flex:1;cursor:pointer;accent-color:var(--accent)">
+          <span id="subtitle-size-val" style="font-size:.75rem;color:var(--accent2);min-width:36px;text-align:right;font-weight:600;">100%</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <label style="font-size:.75rem;font-weight:600;color:var(--text-muted);min-width:120px;letter-spacing:.03em;">Position Y titre</label>
+          <input type="range" id="title-offset-y" min="-120" max="120" value="0" step="2" style="flex:1;cursor:pointer;accent-color:var(--accent)">
+          <span id="title-offset-y-val" style="font-size:.75rem;color:var(--accent2);min-width:50px;text-align:right;font-weight:600;">0px</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <label style="font-size:.75rem;font-weight:600;color:var(--text-muted);min-width:120px;letter-spacing:.03em;">Position Y sous-titre</label>
+          <input type="range" id="subtitle-offset-y" min="-120" max="120" value="0" step="2" style="flex:1;cursor:pointer;accent-color:var(--accent)">
+          <span id="subtitle-offset-y-val" style="font-size:.75rem;color:var(--accent2);min-width:50px;text-align:right;font-weight:600;">0px</span>
+        </div>
+        <div id="bg-picker-inline" style="margin-top:6px;">
+          <div style="font-size:.72rem;font-weight:600;color:var(--text-muted);margin-bottom:8px;letter-spacing:.03em;text-transform:uppercase;">Fond de carte</div>
+          <div class="bg-gallery-grid">
+            <div class="bg-gallery-col">
+              <div class="bg-gallery-col-label">Photos premium</div>
+              <div id="bg-options-premium" class="bg-gallery-scroll">
+                <div class="bg-option" data-bg="" onclick="selectBg('')" title="Aucun fond">
+                  <div class="bg-option-inner bg-none-thumb">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1.5"><line x1="4" y1="4" x2="20" y2="20"/><line x1="20" y1="4" x2="4" y2="20"/></svg>
+                  </div>
+                  <span>Aucun</span>
+                </div>
+              </div>
+            </div>
+            <div class="bg-gallery-col">
+              <div class="bg-gallery-col-label">Fonds de carte</div>
+              <div id="bg-options-cardbacks" class="bg-gallery-scroll">
+                <div class="bg-option selected" data-bg="" onclick="selectBg('')" title="Aucun fond">
+                  <div class="bg-option-inner bg-none-thumb">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1.5"><line x1="4" y1="4" x2="20" y2="20"/><line x1="20" y1="4" x2="4" y2="20"/></svg>
+                  </div>
+                  <span>Aucun</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div id="bg-loading" style="font-size:.7rem;color:var(--text-muted);margin-top:6px;display:none;">Chargement...</div>
+        </div>
+        <div style="margin-top:20px;padding-top:18px;border-top:1px solid var(--border);">
+          <button class="btn-primary-full" onclick="goToFinalPreview()" style="background:var(--success);">
+            Valider ma carte
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// BUILD MAP — Step 2
+// ============================================================
+
+(function loadSourceImage() {
+  var data = sessionStorage.getItem('sky_capture');
+  var el = document.getElementById('capture-preview');
+  if (data) {
+    el.innerHTML = '<img src="' + data + '" alt="Ciel capture" style="width:100%;height:100%;object-fit:cover">';
+  } else {
+    window.location.href = '/choose-sky';
+  }
+})();
+
+// --- Pickers ---
+function setupPicker(selector, callback) {
+  document.querySelectorAll(selector + ' .font-option').forEach(function(el) {
+    el.addEventListener('click', function() {
+      document.querySelectorAll(selector + ' .font-option').forEach(function(e) { e.classList.remove('selected'); });
+      this.classList.add('selected');
+      callback();
+    });
+  });
+}
+
+setupPicker('#title-font-picker', renderPreviewCard);
+setupPicker('#subtitle-font-picker', renderPreviewCard);
+
+document.querySelectorAll('.style-option').forEach(function(el) {
+  el.addEventListener('click', function() {
+    document.querySelectorAll('.style-option').forEach(function(e) { e.classList.remove('selected'); });
+    this.classList.add('selected');
+    renderPreviewCard();
+  });
+});
+
+document.querySelectorAll('.orientation-option').forEach(function(el) {
+  el.addEventListener('click', function() {
+    document.querySelectorAll('.orientation-option').forEach(function(e) { e.classList.remove('selected'); });
+    this.classList.add('selected');
+    renderPreviewCard();
+  });
+});
+
+// --- Debounce ---
+var debounceTimer = null;
+function onInputChange() {
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(renderPreviewCard, 400);
+}
+document.getElementById('build-title').addEventListener('input', onInputChange);
+document.getElementById('build-subtitle').addEventListener('input', onInputChange);
+
+// --- Text size sliders ---
+function updateTitleSize(val) {
+  document.getElementById('title-size-val').textContent = val + '%';
+  var el = document.getElementById('build-card-title');
+  if (el) el.style.fontSize = (val / 100) + 'rem';
+}
+function updateSubtitleSize(val) {
+  document.getElementById('subtitle-size-val').textContent = val + '%';
+  var el = document.getElementById('build-card-subtitle');
+  if (el) el.style.fontSize = (val / 100) + 'rem';
+}
+function updateTitleOffsetY(val) {
+  document.getElementById('title-offset-y-val').textContent = parseInt(val, 10) + 'px';
+}
+function updateSubtitleOffsetY(val) {
+  document.getElementById('subtitle-offset-y-val').textContent = parseInt(val, 10) + 'px';
+}
+document.getElementById('title-size').addEventListener('input', function() {
+  updateTitleSize(this.value);
+  renderPreviewCard();
+});
+document.getElementById('subtitle-size').addEventListener('input', function() {
+  updateSubtitleSize(this.value);
+  renderPreviewCard();
+});
+document.getElementById('title-offset-y').addEventListener('input', function() {
+  updateTitleOffsetY(this.value);
+  renderPreviewCard();
+});
+document.getElementById('subtitle-offset-y').addEventListener('input', function() {
+  updateSubtitleOffsetY(this.value);
+  renderPreviewCard();
+});
+
+// --- Background picker ---
+var selectedBg = '';  // '' = aucun, sinon chemin de l'image
+
+function selectBg(bgUrl) {
+  selectedBg = bgUrl;
+  document.querySelectorAll('.bg-option').forEach(function(el) {
+    el.classList.toggle('selected', el.getAttribute('data-bg') === bgUrl);
+  });
+  renderPreviewCard();
+}
+
+function addBgOption(containerId, id, thumbUrl, fullUrl) {
+  var container = document.getElementById(containerId);
+  if (!container) return;
+  var el = document.createElement('div');
+  el.className = 'bg-option';
+  el.setAttribute('data-bg', fullUrl || '');
+  el.setAttribute('data-id', id || '');
+  el.title = id ? (id.replace(/[-_]/g, ' ').replace(/\b\w/g, function(m) { return m.toUpperCase(); })) : 'Aucun';
+  var inner = document.createElement('div');
+  inner.className = 'bg-option-inner';
+  if (thumbUrl) {
+    inner.style.backgroundImage = 'url(' + thumbUrl + ')';
+    inner.style.backgroundSize = 'cover';
+    inner.style.backgroundPosition = 'center';
+  } else {
+    inner.classList.add('bg-none-thumb');
+    inner.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1.5"><line x1="4" y1="4" x2="20" y2="20"/><line x1="20" y1="4" x2="4" y2="20"/></svg>';
+  }
+  var span = document.createElement('span');
+  span.textContent = id ? id.substring(0, 12) : 'Aucun';
+  el.appendChild(inner);
+  el.appendChild(span);
+  el.addEventListener('click', function() { selectBg(fullUrl || ''); });
+  container.appendChild(el);
+}
+
+// Charger les photos premium (galerie existante) ET les fonds de carte (dossier statique)
+(function loadBgGalleries() {
+  Promise.all([
+    // Source 1: photos premium depuis l'API
+    fetch('/api/photos').then(function(r) { return r.ok ? r.json() : []; }).catch(function() { return []; }),
+    // Source 2: fonds de carte depuis l'API
+    fetch('/api/card-backgrounds').then(function(r) { return r.ok ? r.json() : { backgrounds: [] }; }).catch(function() { return { backgrounds: [] }; })
+  ]).then(function(results) {
+    var photos = results[0];
+    var cardBgs = results[1];
+
+    // Photos premium — dans la colonne de gauche
+    var list = Array.isArray(photos) ? photos : Object.values(photos || {});
+    list.forEach(function(p) {
+      if (p && p.id) addBgOption('bg-options-premium', p.id, p.thumbUrl, p.imageUrl);
+    });
+
+    // Fonds de carte — dans la colonne de droite
+    var bgList = cardBgs.backgrounds || [];
+    bgList.forEach(function(b) {
+      if (b && b.id) addBgOption('bg-options-cardbacks', b.id, b.thumbUrl, b.fullUrl);
+    });
+  });
+})();
+
+// --- Style palettes ---
+var STYLE_COLORS = {
+  dark: {
+    bg1: '#060c18', bg2: '#0a1628',
+    textColor: '#c8ddf5', subtitleColor: '#7a9cc0',
+    accentColor: 'rgba(74,144,217,0.55)',
+    shadowColor: 'rgba(0,0,0,0.65)'
+  },
+  light: {
+    bg1: '#faf8f2', bg2: '#ede8da',
+    textColor: '#1a1a2e', subtitleColor: '#4a4a6a',
+    accentColor: 'rgba(58,90,138,0.55)',
+    shadowColor: 'rgba(0,0,0,0.18)'
+  },
+  art: {
+    bg1: '#0d1830', bg2: '#1a0a2e',
+    textColor: '#e8d5ff', subtitleColor: '#b8a0d0',
+    accentColor: 'rgba(136,170,255,0.55)',
+    shadowColor: 'rgba(0,0,0,0.65)'
+  }
+};
+
+var TITLE_FONTS = {
+  'Cinzel': "'Cinzel', serif",
+  'Playfair Display': "'Playfair Display', serif",
+  'Cormorant Garamond': "'Cormorant Garamond', serif",
+  'Marcellus': "'Marcellus', serif"
+};
+var SUBTITLE_FONTS = {
+  'Montserrat': "'Montserrat', sans-serif",
+  'Lora': "'Lora', serif",
+  'Libre Baskerville': "'Libre Baskerville', serif",
+  'Cormorant': "'Cormorant Garamond', serif"
+};
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ============================================================
+// RENDER PREVIEW CARD
+// ============================================================
+function renderPreviewCard() {
+  var capture = sessionStorage.getItem('sky_capture');
+  if (!capture) return;
+
+  var title        = document.getElementById('build-title').value || '';
+  var subtitle     = document.getElementById('build-subtitle').value || '';
+  var style        = (document.querySelector('input[name="build-style"]:checked') || {}).value || 'dark';
+  var orientation  = (document.querySelector('input[name="build-orientation"]:checked') || {}).value || 'vertical';
+  var titleFont    = (document.querySelector('input[name="title-font"]:checked') || {}).value || 'Cinzel';
+  var subtitleFont = (document.querySelector('input[name="subtitle-font"]:checked') || {}).value || 'Montserrat';
+  var titleSize    = parseInt(document.getElementById('title-size').value, 10);
+  var subtitleSize = parseInt(document.getElementById('subtitle-size').value, 10);
+  var titleOffsetY = parseInt(document.getElementById('title-offset-y').value, 10) || 0;
+  var subtitleOffsetY = parseInt(document.getElementById('subtitle-offset-y').value, 10) || 0;
+  var isVert       = orientation === 'vertical';
+
+  var C = STYLE_COLORS[style] || STYLE_COLORS.dark;
+  var titleF    = TITLE_FONTS[titleFont] || TITLE_FONTS['Cinzel'];
+  var subtitleF = SUBTITLE_FONTS[subtitleFont] || SUBTITLE_FONTS['Montserrat'];
+
+  var date = sessionStorage.getItem('sky_date') || '';
+  var time = sessionStorage.getItem('sky_time') || '';
+  var location = sessionStorage.getItem('sky_location') || '';
+  var footerLine = [date + (time ? ' ' + time : ''), location].filter(Boolean).join('  ·  ');
+
+  var html;
+  var hasBg = !!selectedBg;
+
+  if (isVert) {
+    // =============================================
+    // VERTICAL — portrait premium
+    // =============================================
+    var cardW = 340, cardH = 520;
+    var r = 116;
+    var cx = cardW / 2;
+    var cy = 155;
+    var textY = cy + r + 22;
+
+    var cardBgStyle = hasBg
+      ? 'background:url(' + selectedBg + ') center center / cover no-repeat;'
+      : 'background:linear-gradient(165deg,' + C.bg1 + ',' + C.bg2 + ');';
+
+    html = '<div style="display:inline-block;width:' + cardW + 'px;height:' + cardH + 'px;' + cardBgStyle + 'border-radius:14px;overflow:hidden;position:relative;box-shadow:0 16px 56px ' + C.shadowColor + ';border:1px solid rgba(74,144,217,0.16);">';
+
+    // Overlay sombre si fond active (pour lisibilite texte)
+    if (hasBg) {
+      html += '<div style="position:absolute;inset:0;background:linear-gradient(165deg,rgba(0,0,0,0.5),rgba(0,0,0,0.25));border-radius:14px;pointer-events:none;"></div>';
+    }
+
+    // Cercle du ciel
+    html += '<div style="position:absolute;left:' + (cx - r) + 'px;top:' + (cy - r) + 'px;width:' + (r*2) + 'px;height:' + (r*2) + 'px;border-radius:50%;overflow:hidden;border:2px solid ' + C.accentColor + ';box-shadow:0 0 0 1px rgba(74,144,217,0.1),0 8px 32px ' + C.shadowColor + ',0 0 50px rgba(74,144,217,0.12);">';
+    html += '<img src="' + capture + '" style="width:100%;height:100%;object-fit:cover;display:block;" alt=""></div>';
+
+    // Ligne decorative
+    if (title || subtitle || footerLine) {
+      html += '<div style="position:absolute;top:' + (textY - 14) + 'px;left:24px;right:24px;height:1px;background:linear-gradient(to right,transparent,' + C.accentColor + ',transparent);"></div>';
+    }
+
+    // Titre
+    if (title) {
+      var titleY = textY + titleOffsetY;
+      html += '<div id="build-card-title" style="position:absolute;top:' + titleY + 'px;left:18px;right:18px;text-align:center;font-family:' + titleF + ';font-size:' + (titleSize / 100) + 'rem;font-weight:600;color:' + C.textColor + ';line-height:1.3;letter-spacing:.04em;text-shadow:0 2px 8px ' + C.shadowColor + ';">' + esc(title) + '</div>';
+      textY += Math.round(34 * titleSize / 100);
+    }
+
+    // Sous-titre
+    if (subtitle) {
+      var subtitleY = textY + subtitleOffsetY;
+      html += '<div id="build-card-subtitle" style="position:absolute;top:' + subtitleY + 'px;left:18px;right:18px;text-align:center;font-family:' + subtitleF + ';font-size:' + (subtitleSize / 100) + 'rem;font-style:italic;color:' + C.subtitleColor + ';line-height:1.4;text-shadow:0 1px 4px ' + C.shadowColor + ';">' + esc(subtitle) + '</div>';
+      textY += Math.round(26 * subtitleSize / 100);
+    }
+
+    // Ligne date+lieu
+    if (footerLine) {
+      html += '<div style="position:absolute;bottom:14px;left:18px;right:18px;text-align:center;font-family:\'Montserrat\',sans-serif;font-size:.6rem;font-weight:300;letter-spacing:.08em;color:' + C.subtitleColor + ';opacity:.65;text-shadow:0 1px 3px ' + C.shadowColor + ';">' + esc(footerLine) + '</div>';
+    }
+
+    // Anneau horizon superpose
+    html += '<div style="position:absolute;left:' + (cx - r - 1) + 'px;top:' + (cy - r - 1) + 'px;width:' + (r*2+2) + 'px;height:' + (r*2+2) + 'px;border-radius:50%;box-shadow:0 0 0 1.5px ' + C.accentColor + ',0 0 0 3px rgba(74,144,217,0.07);pointer-events:none;"></div>';
+
+    // Badge
+    html += '<div style="position:absolute;top:10px;left:50%;transform:translateX(-50%);font-family:\'Montserrat\',sans-serif;font-size:1.12rem;letter-spacing:.12em;text-transform:uppercase;color:' + C.subtitleColor + ';opacity:.68;text-shadow:0 1px 6px ' + C.shadowColor + ';">Sky Store</div>';
+    html += '<div data-watermark-layer="1" style="position:absolute;inset:0;pointer-events:none;overflow:hidden;border-radius:14px;">' +
+      '<div style="position:absolute;left:50%;top:45%;transform:translate(-50%,-50%) rotate(-25deg);font-family:\'Montserrat\',sans-serif;font-size:3.5rem;font-weight:700;letter-spacing:.3em;color:rgba(255,255,255,.28);text-transform:uppercase;white-space:nowrap;user-select:none;text-shadow:0 2px 12px rgba(0,0,0,.5);">SKY STORE</div>' +
+      '<div style="position:absolute;left:50%;bottom:14%;transform:translateX(-50%) rotate(-25deg);font-family:\'Montserrat\',sans-serif;font-size:2.1rem;font-weight:700;letter-spacing:.25em;color:rgba(255,255,255,.24);text-transform:uppercase;white-space:nowrap;user-select:none;text-shadow:0 2px 10px rgba(0,0,0,.45);">SKY STORE</div>' +
+    '</div>';
+
+    html += '</div>';
+
+  } else {
+    // =============================================
+    // HORIZONTAL — affiche paysage premium
+    // Layout: cercle a gauche, texte a droite
+    // =============================================
+    var cardW = 640, cardH = 340;
+    var r = 130;                              // rayon cercle
+    var cy = cardH / 2;                      // cercle centre verticalement
+    var leftEnd = cardH + 10;                // fin zone cercle (dépasse un peu)
+    var textX = leftEnd + 32;                 // depart texte
+    var textW = cardW - textX - 24;          // largeur texte disponible
+    var midY = cardH / 2;                    // milieu vertical pour centrage texte
+
+    var cardBgStyleH = hasBg
+      ? 'background:url(' + selectedBg + ') center center / cover no-repeat;'
+      : 'background:linear-gradient(130deg,' + C.bg1 + ' 0%,' + C.bg2 + ' 100%);';
+
+    html = '<div style="display:inline-block;width:' + cardW + 'px;height:' + cardH + 'px;' + cardBgStyleH + 'border-radius:14px;overflow:hidden;position:relative;box-shadow:0 16px 56px ' + C.shadowColor + ';border:1px solid rgba(74,144,217,0.16);">';
+
+    // Overlay sombre si fond active
+    if (hasBg) {
+      html += '<div style="position:absolute;inset:0;background:linear-gradient(130deg,rgba(0,0,0,0.45),rgba(0,0,0,0.2));border-radius:14px;pointer-events:none;"></div>';
+    }
+
+    // Cercle du ciel a gauche
+    html += '<div style="position:absolute;left:' + (cy - r) + 'px;top:' + (cy - r) + 'px;width:' + (r*2) + 'px;height:' + (r*2) + 'px;border-radius:50%;overflow:hidden;border:2px solid ' + C.accentColor + ';box-shadow:0 0 0 1px rgba(74,144,217,0.08),0 8px 32px ' + C.shadowColor + ',0 0 50px rgba(74,144,217,0.12);">';
+    html += '<img src="' + capture + '" style="width:100%;height:100%;object-fit:cover;display:block;" alt=""></div>';
+
+    // Ligne verticale separatrice subtile
+    html += '<div style="position:absolute;left:' + (leftEnd - 1) + 'px;top:40px;bottom:40px;width:1px;background:linear-gradient(to bottom,transparent,' + C.accentColor + ',transparent);opacity:.4;"></div>';
+
+    // Calcul hauteur totale texte pour centrage (avec taille dynamique)
+    var tH = title  ? Math.round(34 * titleSize / 100) : 0;
+    var sH = subtitle ? Math.round(24 * subtitleSize / 100) : 0;
+    var fH = footerLine ? 20 : 0;
+    var gaps = (title&&subtitle ? 10:0) + (subtitle&&footerLine ? 8:0) + (title&&!subtitle&&footerLine ? 10:0);
+    var totalH = tH + sH + fH + gaps;
+    var curY = midY - totalH / 2;
+
+    // Titre
+    if (title) {
+      var titleYH = curY + titleOffsetY;
+      html += '<div id="build-card-title" style="position:absolute;top:' + titleYH + 'px;left:' + textX + 'px;right:' + (cardW - textX - textW) + 'px;text-align:center;font-family:' + titleF + ';font-size:' + (1.2 * titleSize / 100).toFixed(2) + 'rem;font-weight:600;color:' + C.textColor + ';line-height:1.25;letter-spacing:.03em;text-shadow:0 2px 10px ' + C.shadowColor + ';">' + esc(title) + '</div>';
+      curY += tH + (subtitle ? 10 : (footerLine ? 10 : 0));
+    }
+
+    // Sous-titre
+    if (subtitle) {
+      var subtitleYH = curY + subtitleOffsetY;
+      html += '<div id="build-card-subtitle" style="position:absolute;top:' + subtitleYH + 'px;left:' + textX + 'px;right:' + (cardW - textX - textW) + 'px;text-align:center;font-family:' + subtitleF + ';font-size:' + (0.85 * subtitleSize / 100).toFixed(2) + 'rem;font-style:italic;color:' + C.subtitleColor + ';line-height:1.4;text-shadow:0 1px 5px ' + C.shadowColor + ';">' + esc(subtitle) + '</div>';
+      curY += sH + (footerLine ? 8 : 0);
+    }
+
+    // Ligne date+lieu
+    if (footerLine) {
+      html += '<div style="position:absolute;bottom:14px;left:18px;right:18px;text-align:center;font-family:\'Montserrat\',sans-serif;font-size:.62rem;font-weight:300;letter-spacing:.08em;color:' + C.subtitleColor + ';opacity:.65;text-shadow:0 1px 3px ' + C.shadowColor + ';">' + esc(footerLine) + '</div>';
+    }
+
+    // Anneau horizon superpose
+    html += '<div style="position:absolute;left:' + (cy - r - 1) + 'px;top:' + (cy - r - 1) + 'px;width:' + (r*2+2) + 'px;height:' + (r*2+2) + 'px;border-radius:50%;box-shadow:0 0 0 1.5px ' + C.accentColor + ',0 0 0 3px rgba(74,144,217,0.07);pointer-events:none;"></div>';
+
+    // Badge
+    html += '<div style="position:absolute;top:10px;left:50%;transform:translateX(-50%);font-family:\'Montserrat\',sans-serif;font-size:1.12rem;letter-spacing:.12em;text-transform:uppercase;color:' + C.subtitleColor + ';opacity:.68;text-shadow:0 1px 6px ' + C.shadowColor + ';">Sky Store</div>';
+    html += '<div data-watermark-layer="1" style="position:absolute;inset:0;pointer-events:none;overflow:hidden;border-radius:14px;">' +
+      '<div style="position:absolute;left:52%;top:47%;transform:translate(-50%,-50%) rotate(-25deg);font-family:\'Montserrat\',sans-serif;font-size:3.5rem;font-weight:700;letter-spacing:.3em;color:rgba(255,255,255,.28);text-transform:uppercase;white-space:nowrap;user-select:none;text-shadow:0 2px 12px rgba(0,0,0,.5);">SKY STORE</div>' +
+      '<div style="position:absolute;left:56%;bottom:14%;transform:translateX(-50%) rotate(-25deg);font-family:\'Montserrat\',sans-serif;font-size:2.1rem;font-weight:700;letter-spacing:.25em;color:rgba(255,255,255,.24);text-transform:uppercase;white-space:nowrap;user-select:none;text-shadow:0 2px 10px rgba(0,0,0,.45);">SKY STORE</div>' +
+    '</div>';
+
+    html += '</div>';
+  }
+
+  document.getElementById('build-preview-content').innerHTML = html;
+  var previewArea = document.querySelector('.build-preview-area');
+  if (previewArea) previewArea.classList.toggle('is-vertical', isVert);
+
+  // Sauvegarder params
+  var lat = parseFloat(sessionStorage.getItem('sky_lat'));
+  var lng = parseFloat(sessionStorage.getItem('sky_lng'));
+  sessionStorage.setItem('build_params', JSON.stringify({
+    date: date, time: time, lat: lat, lng: lng,
+    location_name: location,
+    title: title, subtitle: subtitle, style: style,
+    orientation: orientation,
+    titleFont: titleFont, subtitleFont: subtitleFont,
+    titleSize: titleSize, subtitleSize: subtitleSize,
+    titleOffsetY: titleOffsetY, subtitleOffsetY: subtitleOffsetY,
+    backgroundImageUrl: selectedBg
+  }));
+}
+
+// ============================================================
+// RESTORE FORM FROM PARAMS
+// ============================================================
+function initFormFromParams() {
+  var params = JSON.parse(sessionStorage.getItem('build_params') || '{}');
+  if (!params.date) return; // nothing to restore
+
+  // Text fields
+  var titleEl = document.getElementById('build-title');
+  var subEl = document.getElementById('build-subtitle');
+  if (titleEl && params.title) titleEl.value = params.title;
+  if (subEl && params.subtitle) subEl.value = params.subtitle;
+
+  // Style
+  if (params.style) {
+    var styleRadio = document.querySelector('input[name="build-style"][value="' + params.style + '"]');
+    if (styleRadio) { styleRadio.checked = true; styleRadio.closest('.style-option').classList.add('selected'); }
+  }
+
+  // Title font
+  if (params.titleFont) {
+    var tfRadio = document.querySelector('input[name="title-font"][value="' + params.titleFont + '"]');
+    if (tfRadio) { tfRadio.checked = true; tfRadio.closest('.font-option').classList.add('selected'); }
+  }
+
+  // Subtitle font
+  if (params.subtitleFont) {
+    var sfRadio = document.querySelector('input[name="subtitle-font"][value="' + params.subtitleFont + '"]');
+    if (sfRadio) { sfRadio.checked = true; sfRadio.closest('.font-option').classList.add('selected'); }
+  }
+
+  // Orientation
+  if (params.orientation) {
+    var orientRadio = document.querySelector('input[name="build-orientation"][value="' + params.orientation + '"]');
+    if (orientRadio) { orientRadio.checked = true; orientRadio.closest('.orientation-option').classList.add('selected'); }
+  }
+
+  // Text sizes
+  if (params.titleSize) {
+    var tsEl = document.getElementById('title-size');
+    if (tsEl) { tsEl.value = params.titleSize; document.getElementById('title-size-val').textContent = params.titleSize + '%'; }
+  }
+  if (params.subtitleSize) {
+    var ssEl = document.getElementById('subtitle-size');
+    if (ssEl) { ssEl.value = params.subtitleSize; document.getElementById('subtitle-size-val').textContent = params.subtitleSize + '%'; }
+  }
+  if (typeof params.titleOffsetY === 'number') {
+    var toyEl = document.getElementById('title-offset-y');
+    if (toyEl) { toyEl.value = params.titleOffsetY; updateTitleOffsetY(params.titleOffsetY); }
+  } else {
+    updateTitleOffsetY(0);
+  }
+  if (typeof params.subtitleOffsetY === 'number') {
+    var soyEl = document.getElementById('subtitle-offset-y');
+    if (soyEl) { soyEl.value = params.subtitleOffsetY; updateSubtitleOffsetY(params.subtitleOffsetY); }
+  } else {
+    updateSubtitleOffsetY(0);
+  }
+
+  // Restore background selection only if one was saved (do not clear with '')
+  if (params.backgroundImageUrl) {
+    selectBg(params.backgroundImageUrl);
+  }
+}
+
+// ============================================================
+// SESSION CHECK (remplace step1Done serveur — sessionStorage persiste apres restart)
+// ============================================================
+(function checkSession() {
+  if (!sessionStorage.getItem('sky_capture')) {
+    window.location.href = '/choose-sky';
+    return;
+  }
+})();
+
+// ============================================================
+// AUTO-GENERATE ON LOAD
+// ============================================================
+(function autoGenerate() {
+  if (sessionStorage.getItem('sky_capture')) {
+    initFormFromParams();
+    renderPreviewCard();
+  }
+})();
+
+// ============================================================
+// BUILD CARD HTML (pour sauvegarde serveur)
+// bgUrl = fond de carte (galerie, optionnel)
+// skyCaptureUrl = PNG D3-Celestial capture pour le cercle du ciel (optionnel)
+//
+// Regle : le fond galerie ne doit JAMAIS etre envoye au serveur.
+// Il reste sur le navigateur et est mis en CSS direct dans le HTML.
+// ============================================================
+function buildCardHtml(title, subtitle, footerLine, style, orientation, skyCaptureUrl, bgUrl) {
+  var STYLE_COLORS = {
+    dark: { bg1: '#060c18', bg2: '#0a1628', textColor: '#c8ddf5', subtitleColor: '#7a9cc0', accentColor: 'rgba(74,144,217,0.55)', shadowColor: 'rgba(0,0,0,0.65)' },
+    light: { bg1: '#faf8f2', bg2: '#ede8da', textColor: '#1a1a2e', subtitleColor: '#4a4a6a', accentColor: 'rgba(58,90,138,0.55)', shadowColor: 'rgba(0,0,0,0.18)' },
+    art: { bg1: '#0d1830', bg2: '#1a0a2e', textColor: '#e8d5ff', subtitleColor: '#b8a0d0', accentColor: 'rgba(136,170,255,0.55)', shadowColor: 'rgba(0,0,0,0.65)' }
+  };
+  var C = STYLE_COLORS[style] || STYLE_COLORS.dark;
+  var hasBg = !!bgUrl;
+  var isVert = orientation === 'vertical';
+  var scale = isVert ? 1.4 : 1.2;
+
+  if (isVert) {
+    var cardW = Math.round(340 * scale), cardH = Math.round(520 * scale);
+    var r = Math.round(116 * scale), cx = cardW / 2, cy = Math.round(155 * scale);
+    var textY = cy + r + Math.round(22 * scale);
+    var cardBgStyle = hasBg ? 'background:url(' + bgUrl + ') center center / cover no-repeat;' : 'background:linear-gradient(165deg,' + C.bg1 + ',' + C.bg2 + ');';
+    var html = '<div style="display:inline-block;width:' + cardW + 'px;height:' + cardH + 'px;' + cardBgStyle + 'border-radius:14px;overflow:hidden;position:relative;box-shadow:0 20px 80px ' + C.shadowColor + ';border:1px solid rgba(74,144,217,0.16);">';
+    if (hasBg) html += '<div style="position:absolute;inset:0;background:linear-gradient(165deg,rgba(0,0,0,0.5),rgba(0,0,0,0.25));border-radius:14px;pointer-events:none;"></div>';
+    // Cercle du ciel : image directe (PNG D3 capture ou SVG selon ce qui est fourni)
+    if (skyCaptureUrl) html += '<div style="position:absolute;left:' + (cx - r) + 'px;top:' + (cy - r) + 'px;width:' + (r*2) + 'px;height:' + (r*2) + 'px;border-radius:50%;overflow:hidden;border:2px solid ' + C.accentColor + ';box-shadow:0 0 0 1px rgba(74,144,217,0.1),0 10px 40px ' + C.shadowColor + ',0 0 60px rgba(74,144,217,0.15);"><img src="' + skyCaptureUrl + '" style="width:100%;height:100%;object-fit:cover;display:block" alt=""></div>';
+    if (title || subtitle || footerLine) html += '<div style="position:absolute;top:' + (textY - Math.round(14 * scale)) + 'px;left:' + Math.round(20 * scale) + 'px;right:' + Math.round(20 * scale) + 'px;height:1px;background:linear-gradient(to right,transparent,' + C.accentColor + ',transparent);"></div>';
+    if (title) { html += '<div style="position:absolute;top:' + textY + 'px;left:' + Math.round(18 * scale) + 'px;right:' + Math.round(18 * scale) + 'px;text-align:center;font-family:\'Cinzel\',serif;font-size:' + (1.0 * scale).toFixed(2) + 'rem;font-weight:600;color:' + C.textColor + ';line-height:1.3;letter-spacing:.04em;text-shadow:0 2px 10px ' + C.shadowColor + '">' + esc(title) + '</div>'; textY += Math.round(34 * scale); }
+    if (subtitle) { html += '<div style="position:absolute;top:' + textY + 'px;left:' + Math.round(18 * scale) + 'px;right:' + Math.round(18 * scale) + 'px;text-align:center;font-family:\'Montserrat\',sans-serif;font-size:' + (0.78 * scale).toFixed(2) + 'rem;font-style:italic;color:' + C.subtitleColor + ';line-height:1.4;text-shadow:0 1px 5px ' + C.shadowColor + '">' + esc(subtitle) + '</div>'; textY += Math.round(26 * scale); }
+    if (footerLine) html += '<div style="position:absolute;top:' + (textY + Math.round(4 * scale)) + 'px;left:' + Math.round(18 * scale) + 'px;right:' + Math.round(18 * scale) + 'px;text-align:center;font-family:\'Montserrat\',sans-serif;font-size:' + (0.6 * scale).toFixed(2) + 'rem;font-weight:300;letter-spacing:.08em;color:' + C.subtitleColor + ';opacity:.65;text-shadow:0 1px 4px ' + C.shadowColor + '">' + esc(footerLine) + '</div>';
+    html += '<div style="position:absolute;left:' + (cx - r - 1) + 'px;top:' + (cy - r - 1) + 'px;width:' + (r*2+2) + 'px;height:' + (r*2+2) + 'px;border-radius:50%;box-shadow:0 0 0 1.5px ' + C.accentColor + ',0 0 0 3px rgba(74,144,217,0.07);pointer-events:none;"></div>';
+    html += '<div style="position:absolute;bottom:' + Math.round(10 * scale) + 'px;right:' + Math.round(12 * scale) + 'px;font-family:\'Montserrat\',sans-serif;font-size:' + (0.52 * scale).toFixed(2) + 'rem;letter-spacing:.12em;text-transform:uppercase;color:' + C.subtitleColor + ';opacity:.28;text-shadow:0 1px 4px ' + C.shadowColor + '">Sky Store</div>';
+    html += '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;overflow:hidden;border-radius:14px;"><div style="font-family:\'Montserrat\',sans-serif;font-size:' + (3.5 * scale).toFixed(1) + 'rem;font-weight:700;letter-spacing:.3em;color:rgba(255,255,255,.28);text-transform:uppercase;transform:rotate(-25deg);white-space:nowrap;user-select:none;text-shadow:0 2px 12px rgba(0,0,0,.5)">SKY STORE</div></div>';
+    html += '</div>';
+    return html;
+  } else {
+    var cardW = Math.round(640 * scale), cardH = Math.round(340 * scale);
+    var r = Math.round(130 * scale), cy = cardH / 2;
+    var leftEnd = cardH + Math.round(10 * scale);
+    var cardBgStyleH = hasBg ? 'background:url(' + bgUrl + ') center center / cover no-repeat;' : 'background:linear-gradient(130deg,' + C.bg1 + ' 0%,' + C.bg2 + ' 100%);';
+    var html = '<div style="display:inline-block;width:' + cardW + 'px;height:' + cardH + 'px;' + cardBgStyleH + 'border-radius:14px;overflow:hidden;position:relative;box-shadow:0 20px 80px ' + C.shadowColor + ';border:1px solid rgba(74,144,217,0.16);">';
+    if (hasBg) html += '<div style="position:absolute;inset:0;background:linear-gradient(130deg,rgba(0,0,0,0.45),rgba(0,0,0,0.2));border-radius:14px;pointer-events:none;"></div>';
+    if (skyCaptureUrl) html += '<div style="position:absolute;left:' + (cy - r) + 'px;top:' + (cy - r) + 'px;width:' + (r*2) + 'px;height:' + (r*2) + 'px;border-radius:50%;overflow:hidden;border:2px solid ' + C.accentColor + ';box-shadow:0 0 0 1px rgba(74,144,217,0.08),0 10px 40px ' + C.shadowColor + ',0 0 60px rgba(74,144,217,0.12);"><img src="' + skyCaptureUrl + '" style="width:100%;height:100%;object-fit:cover;display:block" alt=""></div>';
+    html += '<div style="position:absolute;left:' + (leftEnd - 1) + 'px;top:' + Math.round(40 * scale) + 'px;bottom:' + Math.round(40 * scale) + 'px;width:1px;background:linear-gradient(to bottom,transparent,' + C.accentColor + ',transparent);opacity:.4;"></div>';
+    var textBlockLeft = leftEnd + Math.round(16 * scale), textBlockRight = Math.round(24 * scale);
+    html += '<div style="position:absolute;top:' + Math.round(40 * scale) + 'px;left:' + textBlockLeft + 'px;right:' + textBlockRight + 'px;bottom:' + Math.round(40 * scale) + 'px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;">';
+    if (title) html += '<div style="font-family:\'Cinzel\',serif;font-size:' + (1.2 * scale).toFixed(2) + 'rem;font-weight:600;color:' + C.textColor + ';line-height:1.25;letter-spacing:.03em;text-shadow:0 2px 12px ' + C.shadowColor + ';text-align:center;width:100%">' + esc(title) + '</div>';
+    if (subtitle) html += '<div style="font-family:\'Montserrat\',sans-serif;font-size:' + (0.85 * scale).toFixed(2) + 'rem;font-style:italic;color:' + C.subtitleColor + ';line-height:1.4;text-shadow:0 1px 6px ' + C.shadowColor + ';text-align:center;margin-top:' + (title ? Math.round(10 * scale) : 0) + 'px;width:100%">' + esc(subtitle) + '</div>';
+    if (footerLine) html += '<div style="font-family:\'Montserrat\',sans-serif;font-size:' + (0.62 * scale).toFixed(2) + 'rem;font-weight:300;letter-spacing:.08em;color:' + C.subtitleColor + ';opacity:.65;text-shadow:0 1px 4px ' + C.shadowColor + ';text-align:center;margin-top:' + ((title||subtitle) ? Math.round(8 * scale) : 0) + 'px;width:100%">' + esc(footerLine) + '</div>';
+    html += '</div>';
+    html += '<div style="position:absolute;left:' + (cy - r - 1) + 'px;top:' + (cy - r - 1) + 'px;width:' + (r*2+2) + 'px;height:' + (r*2+2) + 'px;border-radius:50%;box-shadow:0 0 0 1.5px ' + C.accentColor + ',0 0 0 3px rgba(74,144,217,0.07);pointer-events:none;"></div>';
+    html += '<div style="position:absolute;bottom:' + Math.round(10 * scale) + 'px;right:' + Math.round(12 * scale) + 'px;font-family:\'Montserrat\',sans-serif;font-size:' + (0.52 * scale).toFixed(2) + 'rem;letter-spacing:.12em;text-transform:uppercase;color:' + C.subtitleColor + ';opacity:.28;text-shadow:0 1px 4px ' + C.shadowColor + '">Sky Store</div>';
+    html += '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;overflow:hidden;border-radius:14px;"><div style="font-family:\'Montserrat\',sans-serif;font-size:' + (3.5 * scale).toFixed(1) + 'rem;font-weight:700;letter-spacing:.3em;color:rgba(255,255,255,.28);text-transform:uppercase;transform:rotate(-25deg);white-space:nowrap;user-select:none;text-shadow:0 2px 12px rgba(0,0,0,.5)">SKY STORE</div></div>';
+    html += '</div>';
+    return html;
+  }
+}
+
+function goToFinalPreview() {
+  // Sauvegarder tous les params actuels AVANT de partir
+  var title = document.getElementById('build-title').value || '';
+  var subtitle = document.getElementById('build-subtitle').value || '';
+  var style = (document.querySelector('input[name="build-style"]:checked') || {}).value || 'dark';
+  var orientation = (document.querySelector('input[name="build-orientation"]:checked') || {}).value || 'vertical';
+  var titleFont = (document.querySelector('input[name="title-font"]:checked') || {}).value || 'Cinzel';
+  var subtitleFont = (document.querySelector('input[name="subtitle-font"]:checked') || {}).value || 'Montserrat';
+  var titleSize = parseInt(document.getElementById('title-size').value, 10);
+  var subtitleSize = parseInt(document.getElementById('subtitle-size').value, 10);
+  var titleOffsetY = parseInt(document.getElementById('title-offset-y').value, 10) || 0;
+  var subtitleOffsetY = parseInt(document.getElementById('subtitle-offset-y').value, 10) || 0;
+
+  var params = {
+    date: sessionStorage.getItem('sky_date') || '',
+    time: sessionStorage.getItem('sky_time') || '',
+    lat: parseFloat(sessionStorage.getItem('sky_lat')) || 0,
+    lng: parseFloat(sessionStorage.getItem('sky_lng')) || 0,
+    location_name: sessionStorage.getItem('sky_location') || '',
+    title: title,
+    subtitle: subtitle,
+    style: style,
+    orientation: orientation,
+    titleFont: titleFont,
+    subtitleFont: subtitleFont,
+    titleSize: titleSize,
+    subtitleSize: subtitleSize,
+    titleOffsetY: titleOffsetY,
+    subtitleOffsetY: subtitleOffsetY,
+    backgroundImageUrl: selectedBg
+  };
+  sessionStorage.setItem('build_params', JSON.stringify(params));
+
+  var btn = document.querySelector('.btn-primary-full[onclick="goToFinalPreview()"]') ||
+            document.querySelector('button[onclick="goToFinalPreview()"]');
+  var originalText = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = 'Preparation...'; }
+
+  try {
+    var previewContainer = document.getElementById('build-preview-content');
+    var previewNode = previewContainer ? previewContainer.firstElementChild : null;
+    if (!previewNode) throw new Error('apercu build-map introuvable');
+
+    // Source canonique = HTML exact actuellement affiche en build-map.
+    var watermarkedHtml = previewNode.outerHTML;
+    var cleanNode = previewNode.cloneNode(true);
+    cleanNode.querySelectorAll('[data-watermark-layer="1"]').forEach(function(el) { el.remove(); });
+    var cleanHtml = cleanNode.outerHTML;
+    var cardId = 'card_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+
+    fetch('/api/card/save', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        cardId: cardId,
+        watermarkedHtml: watermarkedHtml,
+        cleanHtml: cleanHtml,
+        exportOptions: params
+      })
+    }).then(function(r) { return r.ok ? r.json() : null; })
+      .then(function(saved) {
+        if (!saved || !saved.previewFilePath || !saved.privateFilePath) {
+          throw new Error('sauvegarde canonique incomplete');
+        }
+        sessionStorage.setItem('cardPreviewId', cardId);
+        sessionStorage.setItem('cardPreviewFile_watermarked', saved.previewFilePath || '');
+        sessionStorage.setItem('cardPreviewFile_clean', saved.privateFilePath || '');
+        sessionStorage.setItem('cardPreviewFile_pdf', saved.pdfPath || '');
+        sessionStorage.setItem('cardPreviewFile_image', saved.imagePath || '');
+        sessionStorage.setItem('cardPreviewCanonicalCleanHtml', cleanHtml);
+        if (saved.exportWarning) console.warn('[goToFinalPreview] Export warning:', saved.exportWarning);
+        console.log('[goToFinalPreview] Source canonique build-map sauvegardee:', saved);
+      })
+      .then(function() {
+        if (btn) { btn.disabled = false; btn.textContent = originalText; }
+        window.location.href = '/final-preview?from=build&card=' + encodeURIComponent(cardId);
+      })
+      .catch(function(e) {
+        if (btn) { btn.disabled = false; btn.textContent = originalText; }
+        console.warn('[goToFinalPreview] Erreur save:', e.message);
+        alert('Impossible de sauvegarder la carte canonique. Reessayez.');
+      });
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.textContent = originalText; }
+    alert('Erreur: ' + e.message);
+  }
+}
+</script>
+<footer><div class="container footer-inner"><div class="footer-brand"><strong>Sky Store</strong></div>
+  <div class="footer-links"><a href="/">Accueil</a><a href="/gallery">Galerie</a><a href="/cgu">CGU</a><a href="/privacy">Confidentialité</a><a href="/account">Mon compte</a></div>
+  <div class="footer-legal"><small>&copy; 2026 Sky Store. Tous droits réservés.</small></div></div></footer>
+</body>
+</html>
+
+
+

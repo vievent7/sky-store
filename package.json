@@ -1,0 +1,37 @@
+{
+  "name": "sky-store",
+  "version": "1.0.0",
+  "description": "Commercial site for selling personalized sky maps and astrophotography",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "scan-photos": "node scripts/scan-photos.js",
+    "check:production-readiness": "node scripts/production-readiness-check.js",
+    "check:go-live-proof": "node scripts/go-live-proof-check.js",
+    "admin:reset-password": "node scripts/reset-admin-password.js",
+    "reset:test-env": "node scripts/reset-test-environment.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "d3": "^3.5.17",
+    "d3-celestial": "^0.7.35",
+    "dotenv": "^16.4.5",
+    "express": "^4.18.3",
+    "express-session": "^1.18.0",
+    "nodemailer": "^6.10.1",
+    "pdfkit": "^0.15.0",
+    "puppeteer": "^24.40.0",
+    "sharp": "^0.34.5",
+    "sql.js": "^1.10.3",
+    "stripe": "^21.0.1",
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

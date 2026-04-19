@@ -1,0 +1,12 @@
+{
+  "name": "celestial-reserve",
+  "version": "1.0.0",
+  "description": "Standalone copy of D3-Celestial interactive sphere",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}

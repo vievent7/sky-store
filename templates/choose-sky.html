@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Choisir le Ciel — Sky Store</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/vendor/d3-celestial/celestial.css">
+  <style>
+    /* Page layout */
+    body { min-height: 100vh; }
+    .step1-layout {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 60px 20px;
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      gap: 48px;
+      align-items: start;
+    }
+    /* Step badge */
+    .step-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(74,144,217,.12);
+      border: 1px solid rgba(74,144,217,.25);
+      color: var(--accent2);
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: .78rem;
+      font-weight: 600;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+      margin-bottom: 20px;
+    }
+    .step-badge svg { flex-shrink: 0; }
+    /* Form panel */
+    .step-form-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 28px 24px;
+    }
+    .step-form-panel h1 {
+      font-family: var(--font-title);
+      font-size: 1.7rem;
+      margin-bottom: 6px;
+    }
+    .step-form-panel p {
+      font-size: .9rem;
+      color: var(--text-muted);
+      margin-bottom: 24px;
+      line-height: 1.5;
+    }
+    .step-form-group { margin-bottom: 18px; }
+    .step-form-group label {
+      display: block;
+      font-size: .82rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      letter-spacing: .03em;
+    }
+    .step-form-group input {
+      width: 100%;
+      padding: 10px 14px;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-size: .95rem;
+      font-family: var(--font-main);
+      transition: border-color .2s;
+      box-sizing: border-box;
+    }
+    .step-form-group select {
+      width: 100%;
+      padding: 10px 14px;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-size: .95rem;
+      font-family: var(--font-main);
+      transition: border-color .2s;
+      box-sizing: border-box;
+    }
+    .step-form-group input:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+    .step-form-group select:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+    .step-checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: .85rem;
+      color: var(--text);
+    }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .btn-generate {
+      width: 100%;
+      padding: 13px;
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: var(--radius);
+      font-size: 1rem;
+      font-weight: 600;
+      font-family: var(--font-main);
+      cursor: pointer;
+      transition: background .2s, transform .1s;
+      margin-top: 8px;
+    }
+    .btn-generate:hover { background: #5a9fe8; transform: translateY(-1px); }
+    .btn-generate:active { transform: translateY(0); }
+    .btn-generate:disabled {
+      opacity: .45;
+      cursor: not-allowed;
+      transform: none;
+      filter: grayscale(.2);
+    }
+    .btn-activate-location {
+      width: 100%;
+      padding: 11px 13px;
+      margin-top: 10px;
+      background: rgba(61,186,120,.16);
+      border: 1px solid rgba(61,186,120,.45);
+      color: #56d698;
+      border-radius: var(--radius);
+      font-size: .93rem;
+      font-weight: 600;
+      font-family: var(--font-main);
+      cursor: pointer;
+      transition: all .2s;
+      display: block;
+    }
+    .btn-activate-location:hover { background: rgba(61,186,120,.24); }
+    .btn-capture {
+      width: 100%;
+      padding: 13px;
+      background: rgba(74,144,217,.15);
+      border: 1px solid rgba(74,144,217,.4);
+      color: var(--accent2);
+      border-radius: var(--radius);
+      font-size: 1rem;
+      font-weight: 600;
+      font-family: var(--font-main);
+      cursor: pointer;
+      transition: all .2s;
+      margin-top: 10px;
+      display: none;
+    }
+    .btn-capture:hover { background: rgba(74,144,217,.25); }
+    .btn-regen {
+      width: 100%;
+      padding: 13px;
+      background: rgba(200,168,75,.15);
+      border: 1px solid rgba(200,168,75,.4);
+      color: #c8a84b;
+      border-radius: var(--radius);
+      font-size: 1rem;
+      font-weight: 600;
+      font-family: var(--font-main);
+      cursor: pointer;
+      transition: all .2s;
+      margin-top: 10px;
+    }
+    .btn-regen:hover { background: rgba(200,168,75,.25); }
+    .btn-next {
+      width: 100%;
+      padding: 14px;
+      background: var(--success);
+      color: white;
+      border: none;
+      border-radius: var(--radius);
+      font-size: 1rem;
+      font-weight: 600;
+      font-family: var(--font-main);
+      cursor: pointer;
+      transition: all .2s;
+      margin-top: 10px;
+      display: none;
+    }
+    .btn-next:hover { background: #45c285; transform: translateY(-1px); }
+    .capture-msg {
+      margin-top: 12px;
+      padding: 10px 14px;
+      background: rgba(61, 186, 120, .12);
+      border: 1px solid rgba(61, 186, 120, .3);
+      border-radius: var(--radius);
+      color: var(--success);
+      font-size: .85rem;
+      text-align: center;
+      display: none;
+    }
+    .capture-msg svg { vertical-align: -3px; margin-right: 4px; }
+    .step-divider {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 18px 0;
+    }
+    /* Sphere panel */
+    .step-sphere-panel {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .sphere-container {
+      position: relative;
+      width: 560px;
+      height: 560px;
+      flex-shrink: 0;
+      background: transparent;
+      border-radius: 14px;
+      border: 1px solid rgba(74,144,217,.2);
+      box-shadow: 0 0 80px rgba(74,144,217,.08);
+      overflow: hidden;
+    }
+    .sphere-halo-ring {
+      position: absolute;
+      inset: 7%;
+      transform: translateY(-5%);
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 0;
+      box-shadow: 0 0 52px rgba(86,156,230,.20), 0 0 18px rgba(110,175,245,.14);
+    }
+    #step-celestial-sphere {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+    /* Celestial overrides */
+    #step-celestial-sphere #celestial-zoomin,
+    #step-celestial-sphere #celestial-zoomout,
+    #step-celestial-sphere #d3-celestial-footer { display: none !important; }
+    #step-celestial-sphere #celestial-map {
+      width: 100% !important;
+      min-width: 0 !important;
+      height: 100% !important;
+      min-height: 0 !important;
+      position: relative !important;
+      overflow: hidden !important;
+    }
+    #step-celestial-sphere canvas,
+    #step-celestial-sphere svg {
+      width: 100% !important;
+      height: 100% !important;
+    }
+    #step-celestial-sphere #celestial-map canvas,
+    #step-celestial-sphere #celestial-map svg {
+      position: absolute !important;
+      left: 50% !important;
+      top: 50% !important;
+      transform: translate(-50%, -50%) !important;
+    }
+    #step-celestial-sphere canvas {
+      filter: drop-shadow(0 0 1.5px rgba(255,255,255,.25))
+              drop-shadow(0 0 3px rgba(170,204,255,.18));
+    }
+    #step-celestial-sphere { animation: sphereFadeIn 1.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) both; }
+    @keyframes sphereFadeIn {
+      from { opacity: 0; transform: scale(0.97); }
+      to   { opacity: 1; transform: scale(1); }
+    }
+    .sphere-hint {
+      margin-top: 14px;
+      font-size: .78rem;
+      color: var(--text-muted);
+      text-align: center;
+    }
+    .sphere-hint span { color: rgba(170,204,255,.45); }
+    .capture-preview-sphere {
+      position: relative;
+      width: 200px;
+      height: 200px;
+      margin: 0 auto;
+    }
+    .capture-preview-halo {
+      position: absolute;
+      inset: 7%;
+      transform: translateY(-5%);
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 0;
+      box-shadow: 0 0 64px rgba(86,156,230,.23), 0 0 24px rgba(110,175,245,.16);
+    }
+    #capture-preview-img {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: 50%;
+      border: 1px solid rgba(74,144,217,.25);
+      display: block;
+    }
+    /* Loading state */
+    .loading-msg {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(1,8,16,.7);
+      color: var(--accent2);
+      font-size: .9rem;
+      border-radius: 14px;
+      z-index: 5;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .3s;
+    }
+    .loading-msg.visible { opacity: 1; pointer-events: auto; }
+    @media (max-width: 980px) {
+      .step1-layout {
+        grid-template-columns: 1fr;
+        gap: 24px;
+        padding: 30px 16px 40px;
+      }
+      .step-form-panel { padding: 22px 18px; }
+      .sphere-container {
+        width: min(100%, 420px);
+        height: auto;
+        aspect-ratio: 1 / 1;
+      }
+      .capture-preview-sphere {
+        width: 160px !important;
+        height: 160px !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Navigation -->
+<nav class="navbar">
+  <div class="nav-inner">
+    <a href="/" class="logo"><img src="/images/sky-store-logo.jpg" alt="Sky Store logo" class="logo-mark">Sky Store
+    </a>
+    <button class="nav-toggle" onclick="document.querySelector('.nav-links').classList.toggle('open')">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+      </svg>
+    </button>
+    <div class="nav-links">
+      <a href="/">Accueil</a>
+      <a href="/choose-sky">Creer ma carte</a>
+      <a href="/gallery">Galerie</a>
+      <a href="/cart">Panier <span id="cart-count" class="badge"></span></a>
+    </div>
+  </div>
+</nav>
+
+<!-- Main layout -->
+<div class="step1-layout">
+
+  <!-- LEFT: Form -->
+  <div>
+    <div class="step-form-panel">
+      <div class="step-badge">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
+        Etape 1 sur 3
+      </div>
+      <h1>Choisissez votre ciel</h1>
+      <p>Entrez la date, l'heure et le lieu. La sphère vous montre exactement ce qui était visible dans le ciel à ce moment-là.</p>
+
+      <form id="sky-form" onsubmit="return false;">
+        <div class="step-form-group">
+          <label for="sky-date">Date *</label>
+          <input type="date" id="sky-date" required value="2000-01-01">
+        </div>
+        <div class="form-row">
+          <div class="step-form-group">
+            <label for="sky-time">Heure</label>
+            <input type="time" id="sky-time" value="21:00">
+          </div>
+        </div>
+        <div class="step-form-group">
+          <label for="sky-location">Lieu * (ville, pays)</label>
+          <input type="text" id="sky-location" placeholder="Ex: Montreal, Quebec" required>
+          <input type="hidden" id="sky-lat">
+          <input type="hidden" id="sky-lng">
+          <small id="geo-status" style="color:var(--text-muted);font-size:.75rem;display:block;margin-top:4px"></small>
+          <button type="button" class="btn-activate-location" id="btn-activate-location" onclick="activateLocation()">
+            Activer lieu
+          </button>
+        </div>
+        <div class="step-form-group">
+          <label for="sky-density">Densite de la sphere</label>
+          <select id="sky-density">
+            <option value="minimal">Minimal (epure)</option>
+            <option value="normal" selected>Normal</option>
+            <option value="dense">Dense (plus riche)</option>
+          </select>
+        </div>
+        <div class="step-form-group" style="margin-top:-8px">
+          <label class="step-checkbox-row" for="sky-show-star-labels">
+            <input type="checkbox" id="sky-show-star-labels" checked>
+            Afficher les noms des etoiles
+          </label>
+        </div>
+        <div class="step-form-group" style="margin-top:-8px">
+          <label for="sky-const-line-color">Couleur des lignes de constellation</label>
+          <select id="sky-const-line-color">
+            <option value="neon_green">Vert fluo</option>
+            <option value="pale_blue">Bleu pale</option>
+            <option value="white">Blanc</option>
+            <option value="beige" selected>Beige</option>
+          </select>
+        </div>
+        <hr class="step-divider">
+        <button type="button" class="btn-generate" id="btn-generate" onclick="generateSky()">
+          ▶ Generer
+        </button>
+        <button type="button" class="btn-capture" id="btn-capture" onclick="captureSky()">
+          ◎ Capturer cette vue
+        </button>
+        <button type="button" class="btn-regen" id="btn-regen" onclick="regenerateSky()" style="display:none">
+          ↻ Regenerer
+        </button>
+        <button type="button" class="btn-next" id="btn-next" onclick="goToStep2()">
+          → Preparer a construire votre carte
+        </button>
+        <div class="capture-msg" id="capture-msg">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+          Vue capturee avec succes
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- RIGHT: Sphere -->
+  <div class="step-sphere-panel">
+    <div class="sphere-container">
+      <div id="sphere-halo-ring" class="sphere-halo-ring"></div>
+      <div id="step-celestial-sphere"></div>
+      <div class="loading-msg" id="loading-msg">Chargement...</div>
+    </div>
+    <!-- Auto-capture preview -->
+    <div id="capture-preview" style="margin-top:16px;display:none">
+      <div style="font-size:.8rem;color:var(--text-muted);margin-bottom:8px;text-align:center">Apercu capture</div>
+      <div class="capture-preview-sphere">
+        <div id="capture-preview-halo" class="capture-preview-halo"></div>
+        <img id="capture-preview-img" src="">
+      </div>
+    </div>
+    <div class="sphere-hint">
+      Glissez pour tourner &nbsp;|&nbsp; Roulette pour zoomer
+    </div>
+  </div>
+
+</div>
+
+<script>
+if (typeof window.getBoundingClientRect !== "function") {
+  window.getBoundingClientRect = function() {
+    return { width: window.innerWidth || 800, height: window.innerHeight || 600, top: 0, left: 0, right: window.innerWidth || 800, bottom: window.innerHeight || 600 };
+  };
+}
+</script>
+<script src="/vendor/d3-lib/d3.min.js"></script>
+<script src="/vendor/d3-celestial/celestial.min.js"></script>
+<script>
+// ============================================================
+// CELESTIAL SPHERE — CHOOSE SKY
+// ============================================================
+
+var celestialReady = false;
+var sphereRendered = false;
+var currentSkyParams = { lat: 45.5, lng: -73.6, date: '2000-01-01', time: '21:00', density: 'normal', showStarLabels: true, constLineColor: 'beige' };
+var locationActivated = false;
+
+function updateGenerateLock() {
+  var btn = document.getElementById('btn-generate');
+  if (!btn) return;
+  btn.disabled = !locationActivated;
+}
+
+function requireLocationActivation() {
+  locationActivated = false;
+  updateGenerateLock();
+  var activateBtn = document.getElementById('btn-activate-location');
+  if (activateBtn) activateBtn.style.display = 'block';
+}
+
+function activateLocation() {
+  locationActivated = true;
+  updateGenerateLock();
+  var status = document.getElementById('geo-status');
+  if (status && status.textContent) {
+    status.textContent = status.textContent.replace(/\s*·\s*Lieu active$/, '') + ' · Lieu active';
+  }
+}
+
+function waitForD3(timeout) {
+  return new Promise(function(resolve, reject) {
+    var start = Date.now();
+    (function check() {
+      if (window.d3) return resolve();
+      if (Date.now() - start > timeout) return reject(new Error('d3 timeout'));
+      setTimeout(check, 50);
+    })();
+  });
+}
+
+function waitForCelestial(timeout) {
+  return new Promise(function(resolve, reject) {
+    var start = Date.now();
+    (function check() {
+      if (window.Celestial && window.Celestial.display) return resolve();
+      if (Date.now() - start > timeout) return reject(new Error('Celestial timeout'));
+      setTimeout(check, 50);
+    })();
+  });
+}
+
+function getSphereOptions() {
+  var densityEl = document.getElementById('sky-density');
+  var labelsEl = document.getElementById('sky-show-star-labels');
+  var constLineColorEl = document.getElementById('sky-const-line-color');
+  return {
+    density: densityEl ? densityEl.value : 'normal',
+    showStarLabels: labelsEl ? !!labelsEl.checked : true,
+    constLineColor: constLineColorEl ? constLineColorEl.value : 'beige'
+  };
+}
+
+function getCelestialConfig(lat, lng, date, time, options) {
+  options = options || { density: 'normal', showStarLabels: true, constLineColor: 'beige' };
+  var starLimit = 5;
+  if (options.density === 'minimal') starLimit = 3.2;
+  if (options.density === 'dense') starLimit = 6;
+  var constLinePalette = {
+    neon_green: '#8cff6b',
+    pale_blue: '#b9dcff',
+    white: '#f3f7ff',
+    beige: '#c8a84b'
+  };
+  var constLineStroke = constLinePalette[options.constLineColor] || '#c8a84b';
+
+  // Parse date/time
+  var d = new Date(date + 'T' + (time || '21:00') + ':00');
+  // Calculate Julian Date
+  var Y = d.getUTCFullYear(), M = d.getUTCMonth() + 1, D = d.getUTCDate();
+  var h = d.getUTCHours() + d.getUTCMinutes() / 60 + d.getUTCSeconds() / 3600;
+  var JD = 367 * Y - Math.floor(7 * (Y + Math.floor((M + 9) / 12)) / 4) + Math.floor(275 * M / 9) + D + 1721013.5 + h / 24;
+  // Greenwich Mean Sidereal Time
+  var T = (JD - 2451545) / 36525;
+  var GMST = 280.46061837 + 360.98564735529 * (JD - 2451545) + T * T * (0.000387933 - T / 38710000);
+  GMST = ((GMST % 360) + 360) % 360;
+  // Local Sidereal Time
+  var LST = GMST + lng;
+  LST = ((LST % 360) + 360) % 360;
+  // Hour angle of vernal equinox → RA of zenith
+  var raZenith = LST; // degrees
+  // Center the sphere on the zenith RA, with latitude as declination offset
+  var centerRa = raZenith;
+  var centerDec = lat;
+  // Clamp for orthographic
+  centerDec = Math.max(-90, Math.min(90, centerDec));
+
+  return {
+    canvaswidth: 1120,
+    canvasheight: 1120,
+    container: 'step-celestial-sphere',
+    datapath: '/vendor/d3-celestial/data/',
+    projection: 'orthographic',
+    transform: 'equatorial',
+    center: [centerRa, centerDec],
+    lang: 'fr',
+    controls: false,
+    interactive: false,
+    stars: {
+      show: true,
+      limit: starLimit,
+      colors: true,
+      style: { fill: '#ffffff', opacity: 0.9, stroke: 'rgba(170,204,255,0.5)', width: 1.2 },
+      proper: !!options.showStarLabels,
+      names: !!options.showStarLabels,
+      namelimit: 2.5,
+      size: 9,
+      symbols: { star: { fill: '#ffffff' } },
+      data: 'stars.6.json'
+    },
+    constellations: {
+      show: true,
+      names: false,
+      desig: false,
+      lines: true,
+      linestyle: { stroke: constLineStroke, width: 0.8, opacity: 0.45 },
+      bounds: false
+    },
+    dsos: { show: false },
+    lines: {
+      graticule: { show: false },
+      equatorial: { show: false },
+      ecliptic: { show: true, stroke: '#c8a84b', width: 0.8, opacity: 0.4 }
+    },
+    mw: {
+      show: true,
+      style: { fill: '#1a3a6b', opacity: 0.4 }
+    }
+  };
+}
+
+function renderSphere(lat, lng, date, time, options) {
+  if (!celestialReady) return;
+  currentSkyParams = {
+    lat: lat,
+    lng: lng,
+    date: date,
+    time: time,
+    density: options && options.density ? options.density : 'normal',
+    showStarLabels: options ? !!options.showStarLabels : true,
+    constLineColor: options && options.constLineColor ? options.constLineColor : 'beige'
+  };
+  Celestial.display(getCelestialConfig(lat, lng, date, time, options));
+}
+
+function showLoading(show) {
+  var el = document.getElementById('loading-msg');
+  if (el) el.className = show ? 'loading-msg visible' : 'loading-msg';
+}
+
+function generateSky() {
+  if (!locationActivated) return;
+  var date = document.getElementById('sky-date').value;
+  var time = document.getElementById('sky-time').value || '21:00';
+  var location = document.getElementById('sky-location').value.trim();
+  var lat = parseFloat(document.getElementById('sky-lat').value);
+  var lng = parseFloat(document.getElementById('sky-lng').value);
+  var sphere = getSphereOptions();
+
+  if (!date || !location) {
+    document.getElementById('sky-location').focus();
+    return;
+  }
+
+  if (isNaN(lat) || isNaN(lng)) {
+    // Use default Montreal if no geocode yet
+    lat = 45.5017;
+    lng = -73.5673;
+  }
+
+  showLoading(true);
+  renderSphere(lat, lng, date, time, sphere);
+
+  // Auto-capture after sphere reaches its new position (transition ends ~600ms)
+  setTimeout(function() {
+    showLoading(false);
+    sphereRendered = true;
+    autoCapture();
+  }, 650);
+}
+
+function rerenderSphereFromForm() {
+  if (!celestialReady) return;
+  var date = document.getElementById('sky-date').value || currentSkyParams.date || '2000-01-01';
+  var time = document.getElementById('sky-time').value || currentSkyParams.time || '21:00';
+  var lat = parseFloat(document.getElementById('sky-lat').value);
+  var lng = parseFloat(document.getElementById('sky-lng').value);
+  if (isNaN(lat) || isNaN(lng)) {
+    lat = currentSkyParams.lat || 45.5017;
+    lng = currentSkyParams.lng || -73.5673;
+  }
+  renderSphere(lat, lng, date, time, getSphereOptions());
+}
+
+function applySphereHaloLevel(level) {
+  var sphere = document.querySelector('.sphere-container');
+  var halo = document.getElementById('sphere-halo-ring');
+  var previewHalo = document.getElementById('capture-preview-halo');
+  if (!sphere || !halo) return;
+  sphere.style.boxShadow = 'none';
+  if (level === 'high') {
+    sphere.style.borderColor = 'rgba(120,180,255,.45)';
+    halo.style.boxShadow = '0 0 96px rgba(100,170,255,.40), 0 0 34px rgba(120,190,255,.26), inset 0 0 18px rgba(90,160,240,.11)';
+    if (previewHalo) previewHalo.style.boxShadow = '0 0 96px rgba(100,170,255,.40), 0 0 34px rgba(120,190,255,.26), inset 0 0 18px rgba(90,160,240,.11)';
+  } else if (level === 'low') {
+    sphere.style.borderColor = 'rgba(74,144,217,.20)';
+    halo.style.boxShadow = '0 0 34px rgba(74,144,217,.13)';
+    if (previewHalo) previewHalo.style.boxShadow = '0 0 34px rgba(74,144,217,.13)';
+  } else {
+    sphere.style.borderColor = 'rgba(90,160,235,.30)';
+    halo.style.boxShadow = '0 0 64px rgba(86,156,230,.23), 0 0 24px rgba(110,175,245,.16)';
+    if (previewHalo) previewHalo.style.boxShadow = '0 0 64px rgba(86,156,230,.23), 0 0 24px rgba(110,175,245,.16)';
+  }
+}
+
+// Geocode location on blur
+document.getElementById('sky-location').addEventListener('blur', function() {
+  var location = this.value.trim();
+  requireLocationActivation();
+  if (!location) return;
+  var status = document.getElementById('geo-status');
+  var activateBtn = document.getElementById('btn-activate-location');
+  status.textContent = 'Recherche...';
+  fetch('/api/geo?location=' + encodeURIComponent(location))
+    .then(function(r) { return r.json(); })
+    .then(function(coords) {
+      if (coords.lat && coords.lng) {
+        document.getElementById('sky-lat').value = coords.lat;
+        document.getElementById('sky-lng').value = coords.lng;
+        status.textContent = coords.display_name ? coords.display_name.split(',').slice(0,2).join(',') : (coords.lat.toFixed(2) + ', ' + coords.lng.toFixed(2));
+        status.style.color = 'var(--success)';
+        if (activateBtn) activateBtn.style.display = 'block';
+      } else {
+        status.textContent = 'Lieu non trouve';
+        status.style.color = 'var(--danger)';
+        if (activateBtn) activateBtn.style.display = 'none';
+      }
+    })
+    .catch(function() {
+      status.textContent = 'Erreur geocodage';
+      status.style.color = 'var(--danger)';
+      if (activateBtn) activateBtn.style.display = 'none';
+    });
+});
+
+// Also geocode on Enter key
+document.getElementById('sky-location').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') this.blur();
+});
+document.getElementById('sky-location').addEventListener('input', function() {
+  requireLocationActivation();
+});
+
+var skyDensityEl = document.getElementById('sky-density');
+if (skyDensityEl) {
+  skyDensityEl.addEventListener('change', rerenderSphereFromForm);
+}
+var skyStarLabelsEl = document.getElementById('sky-show-star-labels');
+if (skyStarLabelsEl) {
+  skyStarLabelsEl.addEventListener('change', rerenderSphereFromForm);
+}
+var skyConstLineColorEl = document.getElementById('sky-const-line-color');
+if (skyConstLineColorEl) {
+  skyConstLineColorEl.addEventListener('change', rerenderSphereFromForm);
+}
+function exportSphereCaptureWithHalo(canvas) {
+  if (!canvas) return '';
+  var w = canvas.width || 560;
+  var h = canvas.height || 560;
+  var out = document.createElement('canvas');
+  out.width = w;
+  out.height = h;
+  var ctx = out.getContext('2d');
+  if (!ctx) return canvas.toDataURL('image/png');
+
+  var alpha = 0.28;
+
+  var cx = w / 2;
+  var cy = h / 2;
+  var r = Math.min(w, h) * 0.44;
+
+  var g1 = ctx.createRadialGradient(cx, cy, r * 0.78, cx, cy, r * 1.20);
+  g1.addColorStop(0, 'rgba(130,190,255,0)');
+  g1.addColorStop(0.70, 'rgba(130,190,255,0)');
+  g1.addColorStop(0.88, 'rgba(130,190,255,' + alpha + ')');
+  g1.addColorStop(1, 'rgba(130,190,255,0)');
+  ctx.fillStyle = g1;
+  ctx.fillRect(0, 0, w, h);
+
+  var outerAlpha = 0.20;
+  var g2 = ctx.createRadialGradient(cx, cy, r * 0.92, cx, cy, r * 1.30);
+  g2.addColorStop(0, 'rgba(105,170,245,0)');
+  g2.addColorStop(0.80, 'rgba(105,170,245,0)');
+  g2.addColorStop(0.94, 'rgba(105,170,245,' + outerAlpha + ')');
+  g2.addColorStop(1, 'rgba(105,170,245,0)');
+  ctx.fillStyle = g2;
+  ctx.fillRect(0, 0, w, h);
+
+  ctx.drawImage(canvas, 0, 0, w, h);
+  return out.toDataURL('image/png');
+}
+
+function autoCapture() {
+  var canvas = document.querySelector('#step-celestial-sphere canvas');
+  if (!canvas) return;
+  var date = document.getElementById('sky-date').value;
+  var time = document.getElementById('sky-time').value || '21:00';
+  var location = document.getElementById('sky-location').value;
+  var lat = parseFloat(document.getElementById('sky-lat').value) || 45.5;
+  var lng = parseFloat(document.getElementById('sky-lng').value) || -73.6;
+  var dataUrl = exportSphereCaptureWithHalo(canvas);
+  sessionStorage.setItem('sky_capture', dataUrl);
+  sessionStorage.setItem('sky_date', date);
+  sessionStorage.setItem('sky_time', time);
+  sessionStorage.setItem('sky_lat', lat);
+  sessionStorage.setItem('sky_lng', lng);
+  sessionStorage.setItem('sky_location', location);
+  sessionStorage.setItem('sky_density', getSphereOptions().density);
+  sessionStorage.setItem('sky_show_star_labels', String(getSphereOptions().showStarLabels));
+  sessionStorage.setItem('sky_const_line_color', getSphereOptions().constLineColor);
+  // Show capture success
+  var msg = document.getElementById('capture-msg');
+  msg.style.display = 'block';
+  setTimeout(function() { msg.style.display = 'none'; }, 3000);
+  document.getElementById('btn-capture').style.display = 'none';
+  document.getElementById('btn-generate').style.display = 'none';
+  document.getElementById('btn-next').style.display = 'block';
+  // Show preview of captured image
+  document.getElementById('capture-preview-img').src = dataUrl;
+  document.getElementById('capture-preview').style.display = 'block';
+  // Show regenerate button
+  document.getElementById('btn-regen').style.display = 'block';
+  document.getElementById('btn-next').style.display = 'block';
+}
+
+function regenerateSky() {
+  // Reset buttons
+  document.getElementById('btn-regen').style.display = 'none';
+  document.getElementById('btn-next').style.display = 'none';
+  document.getElementById('capture-preview').style.display = 'none';
+  document.getElementById('btn-generate').style.display = 'block';
+  document.getElementById('btn-capture').style.display = 'none';
+  document.getElementById('capture-msg').style.display = 'none';
+  // Clear capture so they must re-capture after regenerating
+  sessionStorage.removeItem('sky_capture');
+}
+
+function captureSky() {
+  var canvas = document.querySelector('#step-celestial-sphere canvas');
+  if (!canvas) {
+    alert('Capture impossible — la sphere nest pas prete');
+    return;
+  }
+  var dataUrl = exportSphereCaptureWithHalo(canvas);
+  sessionStorage.setItem('sky_capture', dataUrl);
+  // Save sky params for step 2
+  var date = document.getElementById('sky-date').value;
+  var time = document.getElementById('sky-time').value || '21:00';
+  var location = document.getElementById('sky-location').value;
+  var lat = parseFloat(document.getElementById('sky-lat').value) || 45.5;
+  var lng = parseFloat(document.getElementById('sky-lng').value) || -73.6;
+  sessionStorage.setItem('sky_date', date);
+  sessionStorage.setItem('sky_time', time);
+  sessionStorage.setItem('sky_lat', lat);
+  sessionStorage.setItem('sky_lng', lng);
+  sessionStorage.setItem('sky_location', location);
+  sessionStorage.setItem('sky_density', getSphereOptions().density);
+  sessionStorage.setItem('sky_show_star_labels', String(getSphereOptions().showStarLabels));
+  sessionStorage.setItem('sky_const_line_color', getSphereOptions().constLineColor);
+
+  // Show success feedback
+  var msg = document.getElementById('capture-msg');
+  msg.style.display = 'block';
+  setTimeout(function() { msg.style.display = 'none'; }, 3000);
+
+  // Show regenerate and next buttons
+  document.getElementById('btn-capture').style.display = 'none';
+  document.getElementById('btn-generate').style.display = 'none';
+  document.getElementById('btn-regen').style.display = 'block';
+  document.getElementById('btn-next').style.display = 'block';
+}
+
+function goToStep2() {
+  window.location.href = '/build-map';
+}
+
+// ============================================================
+// INIT — render sphere with defaults on load
+// ============================================================
+(function init() {
+  var savedDensity = sessionStorage.getItem('sky_density');
+  var savedLabels = sessionStorage.getItem('sky_show_star_labels') || sessionStorage.getItem('sky_show_const_labels');
+  var savedConstLineColor = sessionStorage.getItem('sky_const_line_color');
+  var densityEl = document.getElementById('sky-density');
+  var labelsEl = document.getElementById('sky-show-star-labels');
+  var constLineColorEl = document.getElementById('sky-const-line-color');
+  if (densityEl && (savedDensity === 'minimal' || savedDensity === 'normal' || savedDensity === 'dense')) {
+    densityEl.value = savedDensity;
+  }
+  if (labelsEl && savedLabels) {
+    labelsEl.checked = savedLabels !== 'false';
+  }
+  if (constLineColorEl && (savedConstLineColor === 'neon_green' || savedConstLineColor === 'pale_blue' || savedConstLineColor === 'white' || savedConstLineColor === 'beige')) {
+    constLineColorEl.value = savedConstLineColor;
+  }
+  applySphereHaloLevel('high');
+
+  showLoading(true);
+  requireLocationActivation();
+  Promise.all([waitForD3(5000), waitForCelestial(5000)])
+    .then(function() {
+      celestialReady = true;
+      // Default: Montreal 2000-01-01 21:00 — static, no intro animation
+      renderSphere(45.5017, -73.5673, '2000-01-01', '21:00', getSphereOptions());
+      showLoading(false);
+    })
+    .catch(function(e) {
+      showLoading(false);
+      console.warn('[ChooseSky] Init failed:', e.message);
+    });
+})();
+</script>
+</body>
+</html>
+

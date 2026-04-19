@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sky Store — Tes cartes</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #060c18; min-height: 100vh; padding: 20px; color: white; font-family: Arial, sans-serif; }
+    a { color: #4a90d9; }
+    h1 { font-size: 1.3rem; margin-bottom: 4px; color: #d8e8f8; }
+    p { color: #6888aa; font-size: .85rem; margin-bottom: 24px; }
+    .badge { display: inline-block; background: rgba(74,144,217,.2); border: 1px solid rgba(74,144,217,.4); border-radius: 20px; padding: 4px 14px; font-size: .75rem; color: #4a90d9; margin-bottom: 16px; }
+    .card { background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.1); border-radius: 16px; padding: 20px; margin-bottom: 24px; }
+    .card h2 { font-size: 1rem; color: #d8e8f8; margin-bottom: 8px; font-family: Georgia, serif; }
+    .card p { margin-bottom: 12px; font-size: .8rem; }
+    .svg-wrap { width: 100%; max-width: 500px; margin: 0 auto 12px; border-radius: 10px; overflow: hidden; background: #060c18; }
+    .svg-wrap img { width: 100%; height: auto; display: block; }
+    .nav { margin-bottom: 24px; }
+    .nav a { color: #4a90d9; text-decoration: none; font-size: .9rem; }
+    .note { background: rgba(255,200,80,.1); border: 1px solid rgba(255,200,80,.3); border-radius: 10px; padding: 14px; font-size: .82rem; color: #e8d090; margin-bottom: 20px; line-height: 1.6; }
+  </style>
+</head>
+<body>
+  <nav class="nav"><a href="/">← Retour au site</a></nav>
+
+  <span class="badge">PRODUIT FINAL — Telechargeable</span>
+  <h1>Tes cartes Sky Store</h1>
+  <p>Commande du 26 mars 2026</p>
+
+  <div class="note">
+    <strong>Note sur le rendu actuel :</strong><br>
+    Le fichier SVG rendu ici est le produit algorithmique de base — fond degradé, etoiles, constellations, titres.<br>
+    Les images de fond astrophotographie (M42, etoiles) ne sont pas encore integrees dans le SVG. C'est une etape a ajouter pour le produit final livrable.
+  </div>
+
+  <!-- Carte 1: horizontale -->
+  <div class="card">
+    <h2>Carte horizontale</h2>
+    <p>Cairo, Egypt &nbsp;·&nbsp; 1 janvier 2000 &nbsp;·&nbsp; 21:00</p>
+    <div class="svg-wrap">
+      <img src="/demo/patrick_map_9.svg" alt="Carte horizontale">
+    </div>
+    <p><a href="/demo/patrick_map_9.svg" download="sky_store_carte_h.svg">Telecharger SVG HD</a></p>
+  </div>
+
+  <!-- Carte 2: verticale -->
+  <div class="card">
+    <h2>Carte verticale</h2>
+    <p>Cairo, Egypt &nbsp;·&nbsp; 1 janvier 2000 &nbsp;·&nbsp; 21:00</p>
+    <div class="svg-wrap">
+      <img src="/demo/patrick_map_7.svg" alt="Carte verticale">
+    </div>
+    <p><a href="/demo/patrick_map_7.svg" download="sky_store_carte_v.svg">Telecharger SVG HD</a></p>
+  </div>
+
+  <p style="margin-top:20px; font-size:.75rem; color:#445">
+    Fichiers dans: sky-store/public/demo/
+  </p>
+</body>
+</html>

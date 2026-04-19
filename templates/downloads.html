@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mes Telechargements — Sky Store</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<nav class="navbar"><div class="nav-inner"><a href="/" class="logo"><img src="/images/sky-store-logo.jpg" alt="Sky Store logo" class="logo-mark">Sky Store</a>
+  <button class="nav-toggle" onclick="document.querySelector('.nav-links').classList.toggle('open')"><svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
+  <div class="nav-links">
+    <a href="/">Accueil</a><a href="/choose-sky">Creer ma carte</a><a href="/gallery">Galerie</a><a href="/cart">Panier <span id="cart-count" class="badge"></span></a><a href="/account" id="nav-account">Mon compte</a>
+  </div>
+</div></nav>
+
+<section class="section" style="padding-top:40px">
+  <div class="container" style="max-width:700px">
+    <h1 style="margin-bottom:8px">Mes Telechargements</h1>
+    <p style="color:var(--text-muted);margin-bottom:32px">Les fichiers de vos commandes</p>
+    <div id="downloads-list">
+      <p id="downloads-empty" style="color:var(--text-muted)">Chargement...</p>
+    </div>
+  </div>
+</section>
+
+<footer><div class="container footer-inner"><div class="footer-brand"><strong>Sky Store</strong></div>
+  <div class="footer-links"><a href="/">Accueil</a><a href="/gallery">Galerie</a><a href="/cgu">CGU</a><a href="/privacy">Confidentialite</a></div>
+  <div class="footer-legal"><small>&copy; 2026 Sky Store. Tous droits reserves.</small></div></div></footer>
+<script src="/js/app.js"></script>
+<script>
+async function renderDownloadsPage() {
+  await loadMe();
+  if (!currentUser) {
+    window.location.href = '/login';
+    return;
+  }
+  // Redirect to account page section=downloads for the full view
+  const el = document.getElementById('downloads-empty');
+  el.innerHTML = 'Vous trouverez vos telechargements dans <a href=\"/account\" style=\"color:var(--accent)\">votre compte</a>.';
+}
+renderDownloadsPage();
+</script>
+</body>
+</html>
+
+
+
+

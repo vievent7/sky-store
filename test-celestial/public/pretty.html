@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>d3-celestial — Premium Render</title>
+  <script src="/d3-lib/d3.min.js"></script>
+  <script src="/celestial/celestial.min.js"></script>
+  <link rel="stylesheet" href="/celestial/celestial.css">
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #010810;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+    #celestial-map {
+      width: 50vw;
+      height: 50vh;
+      background: radial-gradient(ellipse at center, #050d20 0%, #010810 100%);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    #log {
+      position: fixed;
+      bottom: 10px;
+      left: 10px;
+      color: #0f0;
+      font: 12px monospace;
+      background: rgba(0,0,0,0.8);
+      padding: 8px;
+      border-radius: 4px;
+      max-height: 120px;
+      overflow-y: auto;
+    }
+    #log span { display: block; }
+    .ok { color: #0f0; }
+    .err { color: #f55; }
+  </style>
+</head>
+<body>
+  <div id="celestial-map"></div>
+  <div id="log"></div>
+
+  <script>
+    function log(msg, type) {
+      var el = document.createElement('span');
+      el.textContent = (type === 'err' ? '❌ ' : '✅ ') + msg;
+      el.className = type || 'ok';
+      document.getElementById('log').appendChild(el);
+      console.log((type === 'err' ? '[ERR]' : '[OK]'), msg);
+    }
+
+    function waitForD3(timeout) {
+      return new Promise(function(resolve, reject) {
+        var start = Date.now();
+        function check() {
+          if (window.d3) return resolve();
+          if (Date.now() - start > timeout) return reject(new Error('d3 timeout'));
+          setTimeout(check, 50);
+        }
+        check();
+      });
+    }
+
+    function waitForCelestial(timeout) {
+      return new Promise(function(resolve, reject) {
+        var start = Date.now();
+        function check() {
+          if (window.Celestial) return resolve();
+          if (Date.now() - start > timeout) return reject(new Error('Celestial timeout'));
+          setTimeout(check, 50);
+        }
+        check();
+      });
+    }
+
+    (async function() {
+      try {
+        await waitForD3(3000);
+        log('d3 loaded: v' + d3.version, 'ok');
+
+        await waitForCelestial(3000);
+        log('Celestial loaded: ' + Celestial.version, 'ok');
+
+        Celestial.display({
+          canvaswidth: Math.min(window.innerWidth, 1200),
+          canvasheight: Math.min(window.innerHeight, 800),
+          datapath: '/celestial/data/',
+          projection: 'orthographic',
+          transform: 'equatorial',
+          center: [0, 0],
+         lang: 'en',
+
+          controls: true,
+          interactive: true,
+
+          stars: {
+            show: true,
+            limit: 5,            // plus d'étoiles visibles
+            colors: true,       // couleurs spectrales
+            style: { fill: '#ffffff', opacity: 1 },
+            proper: true,       // noms propres (Sirius, Vega...)
+            names: false,        // pas de Bayer/Flamsteed
+            namelimit: 2.5,     // seulement les plus brillantes ont un nom
+            namestyle: { fill: '#a8c8f0', font: '11px Georgia, serif', align: 'left', baseline: 'top' },
+            desig: false,
+            size: 9,            // étoiles plus grosses
+            symbols: {
+              star: { fill: '#ffffff' }
+            },
+            data: 'stars.6.json'
+          },
+
+          constellations: {
+            show: true,
+            names: false,
+            desig: false,
+            lines: true,        // lignes de constellations visibles
+            linestyle: {
+              stroke: '#c8a84b',
+              width: 0.8,
+              opacity: 0.4     // or/bronze subtil
+            },
+            bounds: false
+          },
+
+          dsos: {
+            show: false
+          },
+
+          lines: {
+            graticule: { show: false },
+            equatorial: { show: false },
+            ecliptic: {
+              show: true,
+              stroke: '#c8a84b',
+              width: 0.8,
+              opacity: 0.35
+            }
+          },
+
+          mw: {
+            show: true,
+            style: {
+              fill: '#1a3a6b',
+              opacity: 0.4
+            }
+          }
+        });
+        log('Celestial.display() called', 'ok');
+
+        var canvas = document.querySelector('#celestial-map canvas') || document.querySelector('#celestial-map svg');
+        if (canvas) {
+          log('Rendu: ' + canvas.nodeName + ' (' + canvas.width + 'x' + canvas.height + ')', 'ok');
+        } else {
+          log('Rendu: container HTML seulement', 'warn');
+        }
+
+      } catch(e) {
+        log('ERREUR: ' + e.message, 'err');
+        console.error(e);
+      }
+    })();
+  </script>
+</body>
+</html>

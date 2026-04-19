@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test Compte — Sky Store</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; background: #0a0a14; color: #c8ddf5; }
+    h1 { color: #4a90d9; }
+    .item { background: #12122a; border: 1px solid #2a2a4a; border-radius: 10px; padding: 14px; margin: 10px 0; display: flex; gap: 14px; align-items: center; }
+    .item img { width: 80px; height: 80px; object-fit: cover; border-radius: 6px; background: #000; }
+    .item-info { flex: 1; }
+    .item-name { font-weight: 600; font-size: 1rem; margin-bottom: 4px; }
+    .item-meta { font-size: .8rem; color: #7a9cc0; margin-bottom: 6px; }
+    .badge { padding: 2px 8px; border-radius: 10px; font-size: .7rem; }
+    .badge-free { background: rgba(61,186,120,.15); color: #3dba78; }
+    .badge-photo { background: rgba(74,144,217,.15); color: #4a90d9; }
+    .badge-sky { background: rgba(200,150,50,.15); color: #c89632; }
+    .btn { padding: 6px 14px; border-radius: 6px; text-decoration: none; font-size: .8rem; cursor: pointer; border: none; }
+    .btn-open { background: #4a90d9; color: #fff; }
+    .btn-del { background: transparent; color: #e05050; border: 1px solid #e05050; }
+    .section-title { margin-top: 24px; font-size: .85rem; color: #7a9cc0; text-transform: uppercase; letter-spacing: 1px; }
+    .total-bar { background: #12122a; border-radius: 10px; padding: 14px; margin: 10px 0; display: flex; justify-content: space-between; align-items: center; }
+    .empty { color: #7a9cc0; padding: 30px; text-align: center; }
+  </style>
+</head>
+<body>
+  <a href="/" style="color:#4a90d9">← Accueil</a>
+  <h1>Test Mon Compte</h1>
+  <div id="content">Chargement...</div>
+
+  <script>
+  // Charger TOUTES les commandes (pas de session)
+  // Utilise le endpoint debug orders simple en dernier
+  async function init() {
+    try {
+      var r = await fetch('/api/debug/orders/simple');
+      var data = await r.json();
+      var container = document.getElementById('content');
+
+      if (!data.orders || data.orders.length === 0) {
+        container.innerHTML = '<p class="empty">Aucune commande en base.</p>';
+        return;
+      }
+
+      // Pour chaque commande, charger les items
+      var html = '';
+      var totalCommands = data.orders.length;
+      var totalItems = 0;
+
+      for (var oi = 0; oi < data.orders.length; oi++) {
+        var order = data.orders[oi];
+        html += '<div class="section-title">Commande #' + order.id + ' — ' + order.status + ' — ' + (order.total / 100) + '$ — ' + order.created_at + '</div>';
+
+        // Charger les items pour cette commande
+        try {
+          var r2 = await fetch('/api/debug/items?orderId=' + order.id);
+          var itemsData = await r2.json();
+          if (itemsData.items && itemsData.items.length > 0) {
+            for (var ji = 0; ji < itemsData.items.length; ji++) {
+              var item = itemsData.items[ji];
+              totalItems++;
+              var meta = {};
+              try { meta = JSON.parse(item.metadata || '{}'); } catch(e) {}
+
+              // Thumbnail
+              var thumb = '<div style="width:80px;height:80px;background:#1a1a3a;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:2rem">&#9733;</div>';
+              if (item.product_type === 'photo' || item.product_type === 'bonus_photo') {
+                if (meta.photoId) {
+                  thumb = '<img src="/api/photos/' + meta.photoId + '/thumb" onerror="this.parentElement.style.background=\'#1a1a3a\';this.style.display=\'none\'">';
+                }
+              } else if (item.product_type === 'sky_map') {
+                if (meta.previewSvgDataUrl) {
+                  thumb = '<img src="' + meta.previewSvgDataUrl + '" style="width:80px;height:80px;object-fit:cover;border-radius:6px" onerror="this.parentElement.style.background=\'#1a1a3a\'">';
+                }
+              }
+
+              // Badge
+              var badge = item.product_type === 'sky_map' ? 'badge-sky' : 'badge-photo';
+              var badgeText = item.product_type === 'sky_map' ? 'Carte du ciel' : 'Photo';
+              if (item.is_bonus) { badge = 'badge-free'; badgeText = 'GRATUIT'; }
+
+              // Lien ouvrir
+              var openLink = '#';
+              if (item.product_type === 'photo' || item.product_type === 'bonus_photo') {
+                openLink = '/images-astro/' + (meta.filename || (meta.photoId + '.jpg'));
+              } else if (item.product_type === 'sky_map' && meta.cardPreviewId) {
+                openLink = '/final-preview?card=' + encodeURIComponent(meta.cardPreviewId);
+              }
+
+              html += '<div class="item">' +
+                thumb +
+                '<div class="item-info">' +
+                  '<div class="item-name">' + item.product_title + ' <span class="badge ' + badge + '">' + badgeText + '</span></div>' +
+                  '<div class="item-meta">Prix: ' + (item.price === 0 ? 'Gratuit' : (item.price / 100) + '$') + '</div>' +
+                  '<div style="display:flex;gap:8px">' +
+                    '<a href="' + openLink + '" target="_blank" class="btn btn-open">Ouvrir</a>' +
+                    '<button class="btn btn-del" onclick="deleteItem(' + item.id + ', ' + order.id + ')">Supprimer</button>' +
+                  '</div>' +
+                '</div>' +
+              '</div>';
+            }
+          } else {
+            html += '<p style="color:#7a9cc0;font-size:.85rem;padding:8px 0">Aucun item dans cette commande</p>';
+          }
+        } catch(e) {
+          html += '<p style="color:#e05050;font-size:.85rem">Erreur items: ' + e.message + '</p>';
+        }
+      }
+
+      html = '<p style="color:#7a9cc0;font-size:.85rem;margin-bottom:16px">' + totalItems + ' item(s) dans ' + totalCommands + ' commande(s)</p>' + html;
+      container.innerHTML = html;
+    } catch(e) {
+      document.getElementById('content').innerHTML = '<p style="color:#e05050">Erreur: ' + e.message + '</p>';
+    }
+  }
+
+  async function deleteItem(itemId, orderId) {
+    if (!confirm('Supprimer cet item?')) return;
+    try {
+      var r = await fetch('/api/orders/items/' + itemId, { method: 'DELETE' });
+      if (r.ok) {
+        alert('Supprime! Rafrachissez la page.');
+      } else {
+        var d = await r.json();
+        alert('Erreur: ' + (d.error || '?'));
+      }
+    } catch(e) { alert('Erreur: ' + e.message); }
+  }
+
+  init();
+  </script>
+</body>
+</html>

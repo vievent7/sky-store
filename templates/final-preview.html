@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Apercu final - Sky Store</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Marcellus&family=Montserrat:wght@300;400;500&family=Lora:ital,wght@0,400;0,600;1,400&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+  <style>
+    body {
+      min-height: 100vh;
+      background:
+        linear-gradient(rgba(10,15,30,.75), rgba(10,15,30,.75)),
+        url('/cielfond.jpg') center center / cover no-repeat;
+    }
+    :root { --success: #27ae60; }
+    .fp-layout {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 60px 20px;
+    }
+    .fp-header {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+    .fp-header h1 {
+      font-family: var(--font-title);
+      font-size: 2rem;
+      margin-bottom: 10px;
+    }
+    .fp-header p {
+      font-size: .95rem;
+      color: var(--text-muted);
+    }
+    .fp-card-container {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 36px;
+    }
+    .fp-actions {
+      display: flex;
+      gap: 14px;
+      justify-content: center;
+    }
+    .fp-btn-back {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 13px 28px; background: rgba(255,255,255,.08);
+      border: 1px solid var(--border); border-radius: var(--radius);
+      color: var(--text); font-size: 1rem; font-weight: 500;
+      text-decoration: none; transition: all .2s; cursor: pointer;
+      font-family: var(--font-main);
+    }
+    .fp-btn-back:hover { background: rgba(255,255,255,.14); color: white; }
+    .fp-btn-cart {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 13px 28px; background: var(--success);
+      border: none; border-radius: var(--radius);
+      color: white; font-size: 1rem; font-weight: 600;
+      cursor: pointer; transition: background .2s, transform .1s;
+      font-family: var(--font-main);
+    }
+    .fp-btn-cart:hover { background: #219153; transform: translateY(-1px); }
+    .fp-btn-cart:active { transform: translateY(0); }
+    .fp-btn-cart:disabled { opacity: .6; cursor: not-allowed; transform: none; }
+    .fp-notice {
+      text-align: center;
+      margin-top: 16px;
+      font-size: .78rem;
+      color: var(--text-muted);
+      padding: 10px 16px;
+      background: rgba(74,144,217,.08);
+      border: 1px solid rgba(74,144,217,.2);
+      border-radius: var(--radius);
+      display: inline-block;
+    }
+    .fp-no-data {
+      text-align: center;
+      padding: 80px 20px;
+      color: var(--text-muted);
+    }
+    .fp-no-data h2 { font-family: var(--font-title); font-size: 1.5rem; margin-bottom: 12px; }
+    .fp-no-data a {
+      display: inline-flex; align-items: center; gap: 6px;
+      margin-top: 16px; padding: 10px 20px;
+      background: var(--accent); color: white;
+      border-radius: var(--radius); text-decoration: none;
+      font-size: .95rem; font-weight: 500;
+    }
+    @media (max-width: 900px) {
+      .fp-layout { padding: 30px 14px; }
+      .fp-header { margin-bottom: 24px; }
+      .fp-header h1 { font-size: 1.6rem; }
+      .fp-card-container { margin-bottom: 22px; }
+      .fp-actions {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .fp-btn-back,
+      .fp-btn-cart {
+        width: 100%;
+        justify-content: center;
+      }
+      .fp-card-container > * {
+        max-width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="nav-inner">
+    <a href="/" class="logo"><img src="/images/sky-store-logo.jpg" alt="Sky Store logo" class="logo-mark">Sky Store
+    </a>
+    <button class="nav-toggle" onclick="document.querySelector('.nav-links').classList.toggle('open')">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+      </svg>
+    </button>
+    <div class="nav-links">
+      <a href="/">Accueil</a>
+      <a href="/choose-sky">Choisir le ciel</a>
+      <a href="/build-map">Construire</a>
+      <a href="/gallery">Galerie</a>
+      <a href="/cart">Panier <span id="cart-count" class="badge"></span></a>
+    </div>
+  </div>
+</nav>
+
+<div class="fp-layout" id="fp-layout">
+  <!-- contenu charge dynamiquement -->
+</div>
+
+<script>
+// ============================================================
+// FINAL PREVIEW - Step 3
+// ============================================================
+// v=2 force le navigateur a recharger le script (cache bust)
+
+var STYLE_COLORS = {
+  dark: {
+    bg1: '#060c18', bg2: '#0a1628',
+    textColor: '#c8ddf5', subtitleColor: '#7a9cc0',
+    accentColor: 'rgba(74,144,217,0.55)',
+    shadowColor: 'rgba(0,0,0,0.65)'
+  },
+  light: {
+    bg1: '#faf8f2', bg2: '#ede8da',
+    textColor: '#1a1a2e', subtitleColor: '#4a4a6a',
+    accentColor: 'rgba(58,90,138,0.55)',
+    shadowColor: 'rgba(0,0,0,0.18)'
+  },
+  art: {
+    bg1: '#0d1830', bg2: '#1a0a2e',
+    textColor: '#e8d5ff', subtitleColor: '#b8a0d0',
+    accentColor: 'rgba(136,170,255,0.55)',
+    shadowColor: 'rgba(0,0,0,0.65)'
+  }
+};
+
+var TITLE_FONTS = {
+  'Cinzel': "'Cinzel', serif",
+  'Playfair Display': "'Playfair Display', serif",
+  'Cormorant Garamond': "'Cormorant Garamond', serif",
+  'Marcellus': "'Marcellus', serif"
+};
+var SUBTITLE_FONTS = {
+  'Montserrat': "'Montserrat', sans-serif",
+  'Lora': "'Lora', serif",
+  'Libre Baskerville': "'Libre Baskerville', serif",
+  'Cormorant': "'Cormorant Garamond', serif"
+};
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// Helper: construit le HTML de la carte
+function buildCardHtml(title, subtitle, footerLine, style, orientation, svgDataUrl, bgUrl, titleSize, subtitleSize) {
+  var ts = titleSize || 100;
+  var ss = subtitleSize || 100;
+  var STYLE_COLORS = {
+    dark: { bg1: '#060c18', bg2: '#0a1628', textColor: '#c8ddf5', subtitleColor: '#7a9cc0', accentColor: 'rgba(74,144,217,0.55)', shadowColor: 'rgba(0,0,0,0.65)' },
+    light: { bg1: '#faf8f2', bg2: '#ede8da', textColor: '#1a1a2e', subtitleColor: '#4a4a6a', accentColor: 'rgba(58,90,138,0.55)', shadowColor: 'rgba(0,0,0,0.18)' },
+    art: { bg1: '#0d1830', bg2: '#1a0a2e', textColor: '#e8d5ff', subtitleColor: '#b8a0d0', accentColor: 'rgba(136,170,255,0.55)', shadowColor: 'rgba(0,0,0,0.65)' }
+  };
+  var C = STYLE_COLORS[style] || STYLE_COLORS.dark;
+  var hasBg = !!bgUrl;
+  var isVert = orientation === 'vertical';
+  var scale = isVert ? 1.4 : 1.2;
+
+  if (isVert) {
+    var cardW = Math.round(340 * scale), cardH = Math.round(520 * scale);
+    var r = Math.round(116 * scale), cx = cardW / 2, cy = Math.round(155 * scale);
+    var textY = cy + r + Math.round(22 * scale);
+    var cardBgStyle = hasBg ? 'background:url(' + bgUrl + ') center center / cover no-repeat;' : 'background:linear-gradient(165deg,' + C.bg1 + ',' + C.bg2 + ');';
+    var html = '<div style="display:inline-block;width:' + cardW + 'px;height:' + cardH + 'px;' + cardBgStyle + 'border-radius:14px;overflow:hidden;position:relative;box-shadow:0 20px 80px ' + C.shadowColor + ';border:1px solid rgba(74,144,217,0.16);">';
+    if (hasBg) html += '<div style="position:absolute;inset:0;background:linear-gradient(165deg,rgba(0,0,0,0.5),rgba(0,0,0,0.25));border-radius:14px;pointer-events:none;"></div>';
+    html += '<div style="position:absolute;left:' + (cx - r) + 'px;top:' + (cy - r) + 'px;width:' + (r*2) + 'px;height:' + (r*2) + 'px;border-radius:50%;overflow:hidden;border:2px solid ' + C.accentColor + ';box-shadow:0 0 0 1px rgba(74,144,217,0.1),0 10px 40px ' + C.shadowColor + ',0 0 60px rgba(74,144,217,0.15);"><img src="' + svgDataUrl + '" style="width:100%;height:100%;object-fit:cover;display:block" alt=""></div>';
+    if (title || subtitle || footerLine) html += '<div style="position:absolute;top:' + (textY - Math.round(14 * scale)) + 'px;left:' + Math.round(20 * scale) + 'px;right:' + Math.round(20 * scale) + 'px;height:1px;background:linear-gradient(to right,transparent,' + C.accentColor + ',transparent);"></div>';
+    if (title) { html += '<div style="position:absolute;top:' + textY + 'px;left:' + Math.round(18 * scale) + 'px;right:' + Math.round(18 * scale) + 'px;text-align:center;font-family:\'Cinzel\',serif;font-size:' + (1.0 * scale).toFixed(2) + 'rem;font-weight:600;color:' + C.textColor + ';line-height:1.3;letter-spacing:.04em;text-shadow:0 2px 10px ' + C.shadowColor + '">' + esc(title) + '</div>'; textY += Math.round(34 * scale); }
+    if (subtitle) { html += '<div style="position:absolute;top:' + textY + 'px;left:' + Math.round(18 * scale) + 'px;right:' + Math.round(18 * scale) + 'px;text-align:center;font-family:\'Montserrat\',sans-serif;font-size:' + (0.78 * scale).toFixed(2) + 'rem;font-style:italic;color:' + C.subtitleColor + ';line-height:1.4;text-shadow:0 1px 5px ' + C.shadowColor + '">' + esc(subtitle) + '</div>'; textY += Math.round(26 * scale); }
+    if (footerLine) html += '<div style="position:absolute;top:' + (textY + Math.round(4 * scale)) + 'px;left:' + Math.round(18 * scale) + 'px;right:' + Math.round(18 * scale) + 'px;text-align:center;font-family:\'Montserrat\',sans-serif;font-size:' + (0.6 * scale).toFixed(2) + 'rem;font-weight:300;letter-spacing:.08em;color:' + C.subtitleColor + ';opacity:.65;text-shadow:0 1px 4px ' + C.shadowColor + '">' + esc(footerLine) + '</div>';
+    html += '<div style="position:absolute;left:' + (cx - r - 1) + 'px;top:' + (cy - r - 1) + 'px;width:' + (r*2+2) + 'px;height:' + (r*2+2) + 'px;border-radius:50%;box-shadow:0 0 0 1.5px ' + C.accentColor + ',0 0 0 3px rgba(74,144,217,0.07);pointer-events:none;"></div>';
+    html += '<div style="position:absolute;bottom:' + Math.round(10 * scale) + 'px;right:' + Math.round(12 * scale) + 'px;font-family:\'Montserrat\',sans-serif;font-size:' + (0.52 * scale).toFixed(2) + 'rem;letter-spacing:.12em;text-transform:uppercase;color:' + C.subtitleColor + ';opacity:.28;text-shadow:0 1px 4px ' + C.shadowColor + '">Sky Store</div>';
+    html += '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;overflow:hidden;border-radius:14px;"><div style="font-family:\'Montserrat\',sans-serif;font-size:' + (3.5 * scale).toFixed(1) + 'rem;font-weight:700;letter-spacing:.3em;color:rgba(255,255,255,.28);text-transform:uppercase;transform:rotate(-25deg);white-space:nowrap;user-select:none;text-shadow:0 2px 12px rgba(0,0,0,.5)">SKY STORE</div></div>';
+    html += '</div>';
+    return html;
+  } else {
+    var cardW = Math.round(640 * scale), cardH = Math.round(340 * scale);
+    var r = Math.round(130 * scale), cy = cardH / 2;
+    var leftEnd = cardH + Math.round(10 * scale);
+    var textX = leftEnd + Math.round(32 * scale);
+    var cardBgStyleH = hasBg ? 'background:url(' + bgUrl + ') center center / cover no-repeat;' : 'background:linear-gradient(130deg,' + C.bg1 + ' 0%,' + C.bg2 + ' 100%);';
+    var html = '<div style="display:inline-block;width:' + cardW + 'px;height:' + cardH + 'px;' + cardBgStyleH + 'border-radius:14px;overflow:hidden;position:relative;box-shadow:0 20px 80px ' + C.shadowColor + ';border:1px solid rgba(74,144,217,0.16);">';
+    if (hasBg) html += '<div style="position:absolute;inset:0;background:linear-gradient(130deg,rgba(0,0,0,0.45),rgba(0,0,0,0.2));border-radius:14px;pointer-events:none;"></div>';
+    html += '<div style="position:absolute;left:' + (cy - r) + 'px;top:' + (cy - r) + 'px;width:' + (r*2) + 'px;height:' + (r*2) + 'px;border-radius:50%;overflow:hidden;border:2px solid ' + C.accentColor + ';box-shadow:0 0 0 1px rgba(74,144,217,0.08),0 10px 40px ' + C.shadowColor + ',0 0 60px rgba(74,144,217,0.12);"><img src="' + svgDataUrl + '" style="width:100%;height:100%;object-fit:cover;display:block" alt=""></div>';
+    html += '<div style="position:absolute;left:' + (leftEnd - 1) + 'px;top:' + Math.round(40 * scale) + 'px;bottom:' + Math.round(40 * scale) + 'px;width:1px;background:linear-gradient(to bottom,transparent,' + C.accentColor + ',transparent);opacity:.4;"></div>';
+    var textBlockLeft = leftEnd + Math.round(16 * scale), textBlockRight = Math.round(24 * scale);
+    html += '<div style="position:absolute;top:' + Math.round(40 * scale) + 'px;left:' + textBlockLeft + 'px;right:' + textBlockRight + 'px;bottom:' + Math.round(40 * scale) + 'px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;">';
+    if (title) html += '<div style="font-family:\'Cinzel\',serif;font-size:' + (1.2 * scale).toFixed(2) + 'rem;font-weight:600;color:' + C.textColor + ';line-height:1.25;letter-spacing:.03em;text-shadow:0 2px 12px ' + C.shadowColor + ';text-align:center;width:100%">' + esc(title) + '</div>';
+    if (subtitle) html += '<div style="font-family:\'Montserrat\',sans-serif;font-size:' + (0.85 * scale).toFixed(2) + 'rem;font-style:italic;color:' + C.subtitleColor + ';line-height:1.4;text-shadow:0 1px 6px ' + C.shadowColor + ';text-align:center;margin-top:' + (title ? Math.round(10 * scale) : 0) + 'px;width:100%">' + esc(subtitle) + '</div>';
+    if (footerLine) html += '<div style="font-family:\'Montserrat\',sans-serif;font-size:' + (0.62 * scale).toFixed(2) + 'rem;font-weight:300;letter-spacing:.08em;color:' + C.subtitleColor + ';opacity:.65;text-shadow:0 1px 4px ' + C.shadowColor + ';text-align:center;margin-top:' + ((title||subtitle) ? Math.round(8 * scale) : 0) + 'px;width:100%">' + esc(footerLine) + '</div>';
+    html += '</div>';
+    html += '<div style="position:absolute;left:' + (cy - r - 1) + 'px;top:' + (cy - r - 1) + 'px;width:' + (r*2+2) + 'px;height:' + (r*2+2) + 'px;border-radius:50%;box-shadow:0 0 0 1.5px ' + C.accentColor + ',0 0 0 3px rgba(74,144,217,0.07);pointer-events:none;"></div>';
+    html += '<div style="position:absolute;bottom:' + Math.round(10 * scale) + 'px;right:' + Math.round(12 * scale) + 'px;font-family:\'Montserrat\',sans-serif;font-size:' + (0.52 * scale).toFixed(2) + 'rem;letter-spacing:.12em;text-transform:uppercase;color:' + C.subtitleColor + ';opacity:.28;text-shadow:0 1px 4px ' + C.shadowColor + '">Sky Store</div>';
+    html += '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;overflow:hidden;border-radius:14px;"><div style="font-family:\'Montserrat\',sans-serif;font-size:' + (3.5 * scale).toFixed(1) + 'rem;font-weight:700;letter-spacing:.3em;color:rgba(255,255,255,.28);text-transform:uppercase;transform:rotate(-25deg);white-space:nowrap;user-select:none;text-shadow:0 2px 12px rgba(0,0,0,.5)">SKY STORE</div></div>';
+    html += '</div>';
+    return html;
+  }
+}
+
+function renderFinalCard() {
+  var params = JSON.parse(sessionStorage.getItem('build_params') || '{}');
+  var capture = sessionStorage.getItem('sky_capture');
+
+  // Verifier si on vient du panier avec un ID de carte specifique
+  var urlParams = new URLSearchParams(window.location.search);
+  var cardId = urlParams.get('card');
+  var fromBuild = urlParams.get('from') === 'build';
+
+  // Si un cardId est specifie, charger le HTML sauvegarde correspondant
+  if (cardId) {
+    var savedHtml = sessionStorage.getItem('cardPreviewHtml_' + cardId) || localStorage.getItem('cardPreviewHtml_' + cardId);
+    if (savedHtml) {
+      var actionsHtml = fromBuild
+        ? ('<div class="fp-actions">' +
+            '<button class="fp-btn-back" onclick="window.location.href=\'/build-map\'">' +
+              '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>' +
+              'Retour modifier' +
+            '</button>' +
+            '<button class="fp-btn-cart" id="btn-add-cart" onclick="addToCart()">' +
+              '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>' +
+              'Ajouter au panier' +
+            '</button>' +
+          '</div><div style="text-align:center;margin-top:16px"><div class="fp-notice">Ce filigrane ne figure pas sur le produit final achete.</div></div>')
+        : ('<div class="fp-actions" style="justify-content:center">' +
+            '<a class="fp-btn-back" href="/cart" style="display:inline-flex;align-items:center;gap:8px;padding:13px 28px;background:rgba(255,255,255,.08);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-size:1rem;font-weight:500;text-decoration:none;transition:all .2s;cursor:pointer;font-family:var(--font-main)">' +
+              '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>' +
+              'Retour au panier' +
+            '</a>' +
+          '</div>');
+
+      document.getElementById('fp-layout').innerHTML =
+        '<div class="fp-header">' +
+          '<div style="display:inline-flex;align-items:center;gap:8px;background:rgba(74,144,217,.12);border:1px solid rgba(74,144,217,.25);color:var(--accent2);padding:6px 14px;border-radius:20px;font-size:.78rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase;margin-bottom:14px">' +
+            '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>' +
+            'Apercu final' +
+          '</div>' +
+          '<h1>Votre carte</h1>' +
+          '<p>Retrouvez votre carte ici.</p>' +
+        '</div>' +
+        '<div class="fp-card-container" id="fp-card">' + savedHtml + '</div>' +
+        actionsHtml;
+      return;
+    }
+    fetch('/storage/previews/' + encodeURIComponent(cardId) + '.html', { cache: 'no-store' })
+      .then(function(r) { return r.ok ? r.text() : null; })
+      .then(function(serverHtml) {
+        if (!serverHtml) throw new Error('preview canonique introuvable');
+        sessionStorage.setItem('cardPreviewHtml_' + cardId, serverHtml);
+        var actionsHtml = fromBuild
+          ? ('<div class="fp-actions">' +
+              '<button class="fp-btn-back" onclick="window.location.href=\'/build-map\'">' +
+                '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>' +
+                'Retour modifier' +
+              '</button>' +
+              '<button class="fp-btn-cart" id="btn-add-cart" onclick="addToCart()">' +
+                '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>' +
+                'Ajouter au panier' +
+              '</button>' +
+            '</div><div style="text-align:center;margin-top:16px"><div class="fp-notice">Ce filigrane ne figure pas sur le produit final achete.</div></div>')
+          : ('<div class="fp-actions" style="justify-content:center">' +
+              '<a class="fp-btn-back" href="/cart" style="display:inline-flex;align-items:center;gap:8px;padding:13px 28px;background:rgba(255,255,255,.08);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-size:1rem;font-weight:500;text-decoration:none;transition:all .2s;cursor:pointer;font-family:var(--font-main)">' +
+                '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>' +
+                'Retour au panier' +
+              '</a>' +
+            '</div>');
+        document.getElementById('fp-layout').innerHTML =
+          '<div class="fp-header">' +
+            '<div style="display:inline-flex;align-items:center;gap:8px;background:rgba(74,144,217,.12);border:1px solid rgba(74,144,217,.25);color:var(--accent2);padding:6px 14px;border-radius:20px;font-size:.78rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase;margin-bottom:14px">' +
+              '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>' +
+              'Apercu final' +
+            '</div>' +
+            '<h1>Votre carte</h1>' +
+            '<p>Retrouvez votre carte ici.</p>' +
+          '</div>' +
+          '<div class="fp-card-container" id="fp-card">' + serverHtml + '</div>' +
+          actionsHtml;
+      })
+      .catch(function() {
+        document.getElementById('fp-layout').innerHTML = '<div class="fp-no-data"><h2>Apercu introuvable</h2><a href="/cart">Retour au panier</a></div>';
+      });
+    return;
+  }
+
+  document.getElementById('fp-layout').innerHTML =
+    '<div class="fp-no-data">' +
+      '<h2>Aucun apercu disponible</h2>' +
+      '<p style="color:var(--text-muted)">Ouvrez cet ecran uniquement avec une carte sauvegardee depuis build-map.</p>' +
+      '<a href="/build-map">Retour a la construction</a>' +
+    '</div>';
+}
+
+function addToCart() {
+  var btn = document.getElementById('btn-add-cart');
+  if (!btn) return;
+  btn.disabled = true;
+  btn.textContent = 'Ajout en cours...';
+
+  var params = JSON.parse(sessionStorage.getItem('build_params') || '{}');
+  // cardPreviewId MUST match what goToFinalPreview saved to disk
+  // DO NOT generate a new one here — that would break the link to the file
+  var cardPreviewId = sessionStorage.getItem('cardPreviewId') || '';
+
+  fetch(window.location.origin + '/api/cart/items', {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      type: 'sky_map',
+      title: params.title || 'Ma carte du ciel',
+      price: 2000, // 20$ CAD
+      metadata: {
+        date: params.date || '',
+        time: params.time || '',
+        lat: params.lat || 0,
+        lng: params.lng || 0,
+        location_name: params.location_name || '',
+        subtitle: params.subtitle || '',
+        style: params.style || 'dark',
+        orientation: params.orientation || 'vertical',
+        titleFont: params.titleFont || 'Cinzel',
+        subtitleFont: params.subtitleFont || 'Montserrat',
+        titleSize: params.titleSize || 100,
+        subtitleSize: params.subtitleSize || 100,
+        titleOffsetY: params.titleOffsetY || 0,
+        subtitleOffsetY: params.subtitleOffsetY || 0,
+        backgroundImageUrl: params.backgroundImageUrl || '',
+        // cardPreviewId MUST match what goToFinalPreview saved to disk
+        // goToFinalPreview saves it in sessionStorage BEFORE redirecting here
+        cardPreviewId: sessionStorage.getItem('cardPreviewId') || '',
+        previewFilePath: sessionStorage.getItem('cardPreviewFile_watermarked') || '',
+        privateFilePath: sessionStorage.getItem('cardPreviewFile_clean') || '',
+        pdfPath: sessionStorage.getItem('cardPreviewFile_pdf') || '',
+        imagePath: sessionStorage.getItem('cardPreviewFile_image') || '',
+        previewSvgDataUrl: sessionStorage.getItem('previewSvgData') || sessionStorage.getItem('sky_capture') || '',
+        validatedCardHtml: sessionStorage.getItem('cardPreviewCanonicalCleanHtml') || sessionStorage.getItem('validatedCardHtml') || '',
+        canonicalSource: 'build_map_saved'
+      }
+    })
+  })
+  .then(function(response) {
+    if (!response || !response.ok) {
+      throw new Error('Erreur serveur: ' + (response ? response.status : 'pas de reponse'));
+    }
+    return response.json();
+  })
+  .then(function(data) {
+    if (data.error) {
+      alert('Erreur: ' + data.error);
+      btn.disabled = false;
+      btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg> Ajouter au panier';
+      return;
+    }
+
+    // Les fichiers sont deja crees par goToFinalPreview dans build-map.html
+    // On stocke juste les chemins en sessionStorage puis redirection
+    var cardId = sessionStorage.getItem('cardPreviewId') || '';
+    var watermarkedPath = sessionStorage.getItem('cardPreviewFile_watermarked') || '';
+    var cleanPath = sessionStorage.getItem('cardPreviewFile_clean') || '';
+    sessionStorage.setItem('previewFilePath', watermarkedPath);
+    sessionStorage.setItem('privateFilePath', cleanPath);
+    window.location.href = '/cart';
+  })
+  .catch(function(err) {
+    alert('Erreur: ' + err.message + ' — Verifiez que le serveur tourne.');
+    btn.disabled = false;
+    btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg> Ajouter au panier';
+  });
+}
+
+// Render on load
+renderFinalCard();
+</script>
+<footer><div class="container footer-inner"><div class="footer-brand"><strong>Sky Store</strong></div>
+  <div class="footer-links"><a href="/">Accueil</a><a href="/gallery">Galerie</a><a href="/cgu">CGU</a><a href="/privacy">Confidentialité</a><a href="/account">Mon compte</a></div>
+  <div class="footer-legal"><small>&copy; 2026 Sky Store. Tous droits réservés.</small></div></div></footer>
+</body>
+</html>
+

@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>d3-celestial Minimal Test</title>
+  <script src="/d3-lib/d3.min.js"></script>
+  <script src="/celestial/celestial.min.js"></script>
+  <link rel="stylesheet" href="/celestial/celestial.css">
+  <style>
+    body { margin: 0; background: #000; }
+    #celestial-map { width: 50vw; height: 50vh; margin: auto; }
+    #log { position: fixed; bottom: 10px; left: 10px; color: #0f0; font: 12px monospace; background: rgba(0,0,0,0.8); padding: 8px; border-radius: 4px; max-height: 120px; overflow-y: auto; }
+    #log span { display: block; }
+    .ok { color: #0f0; }
+    .err { color: #f55; }
+  </style>
+</head>
+<body>
+  <div id="celestial-map"></div>
+  <div id="log"></div>
+
+  <script>
+    function log(msg, type) {
+      var el = document.createElement('span');
+      el.textContent = (type === 'err' ? '❌ ' : '✅ ') + msg;
+      el.className = type || 'ok';
+      document.getElementById('log').appendChild(el);
+      console.log((type === 'err' ? '[ERR]' : '[OK]'), msg);
+    }
+
+    function waitForD3(timeout) {
+      return new Promise(function(resolve, reject) {
+        var start = Date.now();
+        function check() {
+          if (window.d3) return resolve();
+          if (Date.now() - start > timeout) return reject(new Error('d3 timeout'));
+          setTimeout(check, 50);
+        }
+        check();
+      });
+    }
+
+    function waitForCelestial(timeout) {
+      return new Promise(function(resolve, reject) {
+        var start = Date.now();
+        function check() {
+          if (window.Celestial) return resolve();
+          if (Date.now() - start > timeout) return reject(new Error('Celestial timeout'));
+          setTimeout(check, 50);
+        }
+        check();
+      });
+    }
+
+    (async function() {
+      try {
+        // Step 1: d3 loaded
+        await waitForD3(3000);
+        log('d3 loaded: ' + (typeof d3 === 'function' ? 'v' + d3.version : 'unknown'), 'ok');
+        log('d3 loaded', 'ok');
+
+        // Step 2: Celestial loaded
+        await waitForCelestial(3000);
+        log('Celestial loaded: ' + Celestial.version, 'ok');
+
+        // Step 3: Celestial.display()
+        Celestial.display({
+          canvaswidth: Math.min(window.innerWidth, 1200),
+          canvasheight: Math.min(window.innerHeight, 800),
+          datapath: '/celestial/data/',
+          projection: 'orthographic',
+          transform: 'equatorial',
+          stars: { show: true, limit: 6, size: 3 },
+          dsos: { show: false },
+          constellations: { show: false },
+          lines: { graticule: { show: true } }
+        });
+        log('Celestial.display() called', 'ok');
+
+        // Step 4: canvas detected
+        var canvas = document.querySelector('#celestial-map canvas') || document.querySelector('#celestial-map svg');
+        if (canvas) {
+          log('Rendu détecté: ' + canvas.nodeName + ' (' + canvas.width + 'x' + canvas.height + ')', 'ok');
+        } else {
+          log('Rendu détecté: container HTML seulement (pas encore de canvas/SVG)', 'warn');
+        }
+
+      } catch(e) {
+        log('ERREUR: ' + e.message, 'err');
+        console.error(e);
+      }
+    })();
+  </script>
+</body>
+</html>
