@@ -18,7 +18,7 @@ const Stripe = require('stripe');
 const gallery = require('./photo-gallery');
 
 // Mode simulation: MOCK_STRIPE=true (defaut) ou cle placeholder
-let isMockMode = process.env.MOCK_STRIPE !== 'false'
+const MOCK_STRIPE = process.env.MOCK_STRIPE !== 'false'
   && (process.env.MOCK_STRIPE === 'true'
     || !process.env.STRIPE_SECRET_KEY
     || process.env.STRIPE_SECRET_KEY.includes('YOUR_')
@@ -26,7 +26,7 @@ let isMockMode = process.env.MOCK_STRIPE !== 'false'
 
 let stripe = null;
 
-if (!isMockMode) {
+if (!MOCK_STRIPE) {
   try {
     stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
       apiVersion: '2023-10-16'
@@ -35,11 +35,10 @@ if (!isMockMode) {
   } catch (e) {
     console.warn('[Stripe] Erreur de chargement Stripe:', e.message);
     console.warn('[Stripe] Falling back en mode SIMULATION');
-    isMockMode = true;
   }
 }
 
-if (isMockMode) {
+if (MOCK_STRIPE) {
   console.log('[Stripe] Mode SIMULATION (MOCK_STRIPE=true ou cle non configuree)');
 }
 
@@ -48,20 +47,20 @@ if (isMockMode) {
 // ============================================================
 
 const VALID_PRICES = {
-  sky_map: 2000,    // 20.00$ CAD
-  bonus_photo: 0,   // gratuit
-  ambiance: 199,    // prix unitaire affichage (le pack est applique dans orders/cart)
-  bonus_ambiance: 0 // gratuit
+  sky_map: 2000,      // 20.00$ CAD
+  ambiance: 199,      // 1.99$ CAD
+  bonus_photo: 0,     // gratuit
+  bonus_ambiance: 0,  // gratuit
 };
 
 function resolveExpectedPrice(item) {
   if (item.type === 'sky_map') return VALID_PRICES.sky_map;
-  if (item.type === 'bonus_photo') return VALID_PRICES.bonus_photo;
-  if (item.type === 'bonus_ambiance') return VALID_PRICES.bonus_ambiance;
   if (item.type === 'ambiance') {
     const price = Number(item.price);
     return Number.isFinite(price) && price >= 0 ? Math.round(price) : VALID_PRICES.ambiance;
   }
+  if (item.type === 'bonus_photo') return VALID_PRICES.bonus_photo;
+  if (item.type === 'bonus_ambiance') return VALID_PRICES.bonus_ambiance;
   if (item.type === 'photo') {
     // Prix serveur au checkout: celui en galerie pour ce photoId, fallback sur le prix deja stocke en panier.
     const photoId = item.metadata && item.metadata.photoId;
@@ -82,7 +81,7 @@ function validateItem(item) {
     return { valid: false, error: `Type de produit inconnu: ${item.type}` };
   }
   // En mode mock, le prix peut Ãªtre 0 (bonus) ou le prix normal
-  if (!isMockMode && item.price !== validPrice) {
+  if (!MOCK_STRIPE && item.price !== validPrice) {
     return { valid: false, error: `Prix invalide pour ${item.type}: ${item.price} (attendu: ${validPrice})` };
   }
   return { valid: true, price: validPrice };
@@ -102,18 +101,9 @@ function validateItem(item) {
  */
 async function createCheckoutSession(items, successUrl, cancelUrl, customerEmail = null, taxAmount = 0) {
   const normalizedTaxAmount = Number.isFinite(taxAmount) && taxAmount > 0 ? Math.round(taxAmount) : 0;
-  console.log('[stripe][debug] createCheckoutSession called', {
-    isMockMode,
-    hasStripeClient: !!stripe,
-    itemCount: items.length,
-    taxAmount: normalizedTaxAmount,
-    successUrl,
-    cancelUrl,
-    customerEmail: customerEmail || null
-  });
 
   // === MODE SIMULATION ===
-  if (isMockMode) {
+  if (MOCK_STRIPE) {
     const mockId = 'mock_' + uuidv4();
     const total = items.reduce((sum, item) => {
       const v = validateItem(item);
@@ -136,19 +126,12 @@ async function createCheckoutSession(items, successUrl, cancelUrl, customerEmail
 
   // === MODE REEL ===
   const lineItems = [];
-  const skippedNonBillableItems = [];
   for (const item of items) {
     const validated = validateItem(item);
     if (!validated.valid) {
       throw new Error(validated.error);
     }
     if (!Number.isFinite(validated.price) || validated.price <= 0) {
-      skippedNonBillableItems.push({
-        type: item.type,
-        title: item.title || item.type,
-        quantity: item.quantity || 1,
-        unit_amount: validated.price
-      });
       continue;
     }
     lineItems.push({
@@ -158,25 +141,18 @@ async function createCheckoutSession(items, successUrl, cancelUrl, customerEmail
           name: item.title || 'Carte du ciel personnalisee',
           description: item.type === 'sky_map'
             ? `Carte du ciel â€” ${item.metadata?.location_name || ''} ${item.metadata?.date || ''}`.trim()
-            : 'Photo astrophotographie',
+            : (item.type === 'ambiance' || item.type === 'bonus_ambiance')
+              ? 'Ambiance sonore'
+              : 'Photo astrophotographie',
         },
         unit_amount: validated.price,
       },
       quantity: item.quantity || 1,
     });
   }
-  if (skippedNonBillableItems.length) {
-    console.log('[stripe][debug] skipped_non_billable_items', skippedNonBillableItems);
-  }
   if (!lineItems.length) {
     throw new Error('Aucun article facturable pour Stripe');
-  }
-  console.log('[stripe][debug] line_items', lineItems.map(li => ({
-    name: li.price_data?.product_data?.name,
-    amount: li.price_data?.unit_amount,
-    quantity: li.quantity
-  })));
-  if (normalizedTaxAmount > 0) {
+  }  if (normalizedTaxAmount > 0) {
     lineItems.push({
       price_data: {
         currency: 'cad',
@@ -189,11 +165,6 @@ async function createCheckoutSession(items, successUrl, cancelUrl, customerEmail
       quantity: 1
     });
   }
-  console.log('[stripe][debug] line_items_with_tax', lineItems.map(li => ({
-    name: li.price_data?.product_data?.name,
-    amount: li.price_data?.unit_amount,
-    quantity: li.quantity
-  })));
 
   if (!stripe) {
     throw new Error('Stripe indisponible: client non initialise');
@@ -220,7 +191,7 @@ async function createCheckoutSession(items, successUrl, cancelUrl, customerEmail
  * @returns {Promise<{paid: boolean, status: string, mock: boolean, customerEmail?: string|null}>}
  */
 async function getSessionStatus(sessionId) {
-  if (isMockMode || !sessionId || sessionId.startsWith('mock_')) {
+  if (MOCK_STRIPE || !sessionId || sessionId.startsWith('mock_')) {
     return { paid: true, status: 'paid', mock: true, customerEmail: null };
   }
 
@@ -256,7 +227,8 @@ module.exports = {
   createCheckoutSession,
   getSessionStatus,
   constructWebhookEvent,
-  isMock: () => isMockMode,
+  isMock: () => MOCK_STRIPE,
   VALID_PRICES,
 };
+
 

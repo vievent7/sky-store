@@ -60,9 +60,6 @@ function _createSchema() {
   try { _sqlite.run('ALTER TABLE users ADD COLUMN email_verification_expires_at TEXT'); } catch (_) {}
   try { _sqlite.run('ALTER TABLE users ADD COLUMN password_reset_token TEXT'); } catch (_) {}
   try { _sqlite.run('ALTER TABLE users ADD COLUMN password_reset_expires TEXT'); } catch (_) {}
-  try { _sqlite.run("ALTER TABLE users ADD COLUMN tenant_id TEXT DEFAULT 'public'"); } catch (_) {}
-  _sqlite.run("UPDATE users SET tenant_id = COALESCE(NULLIF(tenant_id, ''), 'public')");
-  _sqlite.run('CREATE INDEX IF NOT EXISTS idx_users_tenant_email ON users(tenant_id, email)');
   _sqlite.run(`
     CREATE TABLE IF NOT EXISTS orders (
       id                INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -73,13 +70,9 @@ function _createSchema() {
       status            TEXT    NOT NULL DEFAULT 'pending',
       stripe_session_id TEXT,
       free_photo_credit INTEGER DEFAULT 0,
-      tenant_id         TEXT    DEFAULT 'public',
       created_at        TEXT    DEFAULT (datetime('now'))
     )
   `);
-  try { _sqlite.run("ALTER TABLE orders ADD COLUMN tenant_id TEXT DEFAULT 'public'"); } catch (_) {}
-  _sqlite.run("UPDATE orders SET tenant_id = COALESCE(NULLIF(tenant_id, ''), 'public')");
-  _sqlite.run('CREATE INDEX IF NOT EXISTS idx_orders_tenant_created ON orders(tenant_id, created_at)');
   _sqlite.run(`
     CREATE TABLE IF NOT EXISTS order_items (
       id             INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -124,7 +117,6 @@ function _createSchema() {
       id           INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id      INTEGER,
       session_id   TEXT,
-      tenant_id    TEXT    DEFAULT 'public',
       product_type TEXT,
       product_title TEXT,
       price        INTEGER NOT NULL DEFAULT 0,
@@ -138,9 +130,6 @@ function _createSchema() {
   try {
     _sqlite.run('ALTER TABLE cart ADD COLUMN user_id INTEGER');
   } catch (_) { /* colonne existe déjà */ }
-  try { _sqlite.run("ALTER TABLE cart ADD COLUMN tenant_id TEXT DEFAULT 'public'"); } catch (_) {}
-  _sqlite.run("UPDATE cart SET tenant_id = COALESCE(NULLIF(tenant_id, ''), 'public')");
-  _sqlite.run('CREATE INDEX IF NOT EXISTS idx_cart_tenant_user_session ON cart(tenant_id, user_id, session_id)');
   _sqlite.run(`
     CREATE TABLE IF NOT EXISTS products (
       id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -153,26 +142,6 @@ function _createSchema() {
       created_at  TEXT    DEFAULT (datetime('now'))
     )
   `);
-  _sqlite.run(`
-    CREATE TABLE IF NOT EXISTS workflow_jobs (
-      id             TEXT PRIMARY KEY,
-      tenant_id      TEXT    NOT NULL DEFAULT 'public',
-      type           TEXT    NOT NULL,
-      status         TEXT    NOT NULL DEFAULT 'queued',
-      attempt_count  INTEGER NOT NULL DEFAULT 0,
-      max_attempts   INTEGER NOT NULL DEFAULT 1,
-      payload        TEXT,
-      result         TEXT,
-      correlation_id TEXT,
-      last_error     TEXT,
-      started_at     TEXT,
-      finished_at    TEXT,
-      created_at     TEXT    DEFAULT (datetime('now')),
-      updated_at     TEXT    DEFAULT (datetime('now'))
-    )
-  `);
-  _sqlite.run('CREATE INDEX IF NOT EXISTS idx_workflow_jobs_tenant_created ON workflow_jobs(tenant_id, created_at)');
-  _sqlite.run('CREATE INDEX IF NOT EXISTS idx_workflow_jobs_status ON workflow_jobs(status)');
   _persist();
 }
 
@@ -185,8 +154,6 @@ class Stmt {
     this._stmt   = null;
     this._params = [];
     this._row    = null;
-    this._lastInsertRowid = null;
-    this._changes = null;
   }
 
   set(sql) { this._sql = sql; return this; }
@@ -222,20 +189,8 @@ class Stmt {
   run(...params) {
     const p = params.length ? params : this._params;
     const stmt = this._sqlite.prepare(this._sql);
-    if (p.length) {
-      stmt.run(p);
-    } else {
-      stmt.run();
-    }
-    // Capture insert/update metadata before persisting.
-    const rowidStmt = this._sqlite.prepare('SELECT last_insert_rowid() as id');
-    rowidStmt.step();
-    this._lastInsertRowid = rowidStmt.getAsObject().id;
-    rowidStmt.free();
-    const changesStmt = this._sqlite.prepare('SELECT changes() as c');
-    changesStmt.step();
-    this._changes = changesStmt.getAsObject().c;
-    changesStmt.free();
+    if (p.length) stmt.bind(p);
+    stmt.step();
     stmt.free();
     _persist();
     return this;
@@ -246,7 +201,6 @@ class Stmt {
   }
 
   get lastInsertRowid() {
-    if (this._lastInsertRowid != null) return this._lastInsertRowid;
     const stmt = this._sqlite.prepare('SELECT last_insert_rowid() as id');
     stmt.step();
     const row = stmt.getAsObject();
@@ -255,7 +209,6 @@ class Stmt {
   }
 
   get changes() {
-    if (this._changes != null) return this._changes;
     const stmt = this._sqlite.prepare('SELECT changes() as c');
     stmt.step();
     const row = stmt.getAsObject();

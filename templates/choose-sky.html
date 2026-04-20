@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Choisir le Ciel — Sky Store</title>
+  <title>Choisir le Ciel â€” Sky Store</title>
   <link rel="stylesheet" href="/css/style.css">
   <link rel="stylesheet" href="/vendor/d3-celestial/celestial.css">
   <style>
@@ -353,7 +353,7 @@
     <div class="nav-links">
       <a href="/">Accueil</a>
       <a href="/choose-sky">Creer ma carte</a>
-      <a href="/gallery">Galerie</a>
+      <a href="/gallery">Galerie</a><a href="/ambiances">Ambiances</a>
       <a href="/cart">Panier <span id="cart-count" class="badge"></span></a>
     </div>
   </div>
@@ -370,7 +370,7 @@
         Etape 1 sur 3
       </div>
       <h1>Choisissez votre ciel</h1>
-      <p>Entrez la date, l'heure et le lieu. La sphère vous montre exactement ce qui était visible dans le ciel à ce moment-là.</p>
+      <p>Entrez la date, l'heure et le lieu. La sphÃ¨re vous montre exactement ce qui Ã©tait visible dans le ciel Ã  ce moment-lÃ .</p>
 
       <form id="sky-form" onsubmit="return false;">
         <div class="step-form-group">
@@ -418,16 +418,16 @@
         </div>
         <hr class="step-divider">
         <button type="button" class="btn-generate" id="btn-generate" onclick="generateSky()">
-          ▶ Generer
+          â–¶ Generer
         </button>
         <button type="button" class="btn-capture" id="btn-capture" onclick="captureSky()">
-          ◎ Capturer cette vue
+          â—Ž Capturer cette vue
         </button>
         <button type="button" class="btn-regen" id="btn-regen" onclick="regenerateSky()" style="display:none">
-          ↻ Regenerer
+          â†» Regenerer
         </button>
         <button type="button" class="btn-next" id="btn-next" onclick="goToStep2()">
-          → Preparer a construire votre carte
+          â†’ Preparer a construire votre carte
         </button>
         <div class="capture-msg" id="capture-msg">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
@@ -470,7 +470,7 @@ if (typeof window.getBoundingClientRect !== "function") {
 <script src="/vendor/d3-celestial/celestial.min.js"></script>
 <script>
 // ============================================================
-// CELESTIAL SPHERE — CHOOSE SKY
+// CELESTIAL SPHERE â€” CHOOSE SKY
 // ============================================================
 
 var celestialReady = false;
@@ -496,7 +496,7 @@ function activateLocation() {
   updateGenerateLock();
   var status = document.getElementById('geo-status');
   if (status && status.textContent) {
-    status.textContent = status.textContent.replace(/\s*·\s*Lieu active$/, '') + ' · Lieu active';
+    status.textContent = status.textContent.replace(/\s*Â·\s*Lieu active$/, '') + ' Â· Lieu active';
   }
 }
 
@@ -559,7 +559,7 @@ function getCelestialConfig(lat, lng, date, time, options) {
   // Local Sidereal Time
   var LST = GMST + lng;
   LST = ((LST % 360) + 360) % 360;
-  // Hour angle of vernal equinox → RA of zenith
+  // Hour angle of vernal equinox â†’ RA of zenith
   var raZenith = LST; // degrees
   // Center the sphere on the zenith RA, with latitude as declination offset
   var centerRa = raZenith;
@@ -830,7 +830,7 @@ function regenerateSky() {
 function captureSky() {
   var canvas = document.querySelector('#step-celestial-sphere canvas');
   if (!canvas) {
-    alert('Capture impossible — la sphere nest pas prete');
+    alert('Capture impossible â€” la sphere nest pas prete');
     return;
   }
   var dataUrl = exportSphereCaptureWithHalo(canvas);
@@ -867,7 +867,7 @@ function goToStep2() {
 }
 
 // ============================================================
-// INIT — render sphere with defaults on load
+// INIT â€” render sphere with defaults on load
 // ============================================================
 (function init() {
   var savedDensity = sessionStorage.getItem('sky_density');
@@ -892,7 +892,7 @@ function goToStep2() {
   Promise.all([waitForD3(5000), waitForCelestial(5000)])
     .then(function() {
       celestialReady = true;
-      // Default: Montreal 2000-01-01 21:00 — static, no intro animation
+      // Default: Montreal 2000-01-01 21:00 â€” static, no intro animation
       renderSphere(45.5017, -73.5673, '2000-01-01', '21:00', getSphereOptions());
       showLoading(false);
     })
@@ -904,4 +904,5 @@ function goToStep2() {
 </script>
 </body>
 </html>
+
 

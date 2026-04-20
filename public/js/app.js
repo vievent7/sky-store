@@ -2,6 +2,12 @@
 
 const SKY_MAP_PRICE = 2000; // 20$ CAD - modifier ici pour changer le prix partout
 var previewLoading = false;
+var ambianceSelection = [];
+var ambianceItems = [];
+var ambianceAddInFlight = false;
+var AMBIANCE_STORAGE_KEY = 'sky_store_selected_ambiances';
+var AMBIANCE_MAP_KEY = 'sky_store_cart_ambiance_map';
+var AMBIANCE_CART_KEY = 'sky_store_cart_ambiances';
 function tr(key, fallback, vars) {
   return fallback || key;
 }
@@ -11,10 +17,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadMe();
   updateNav();
   updateCartCount();
-  initAmbiancesSelectionGuards();
   const p = window.location.pathname;
   if (p === '/cart' || p === '/cart.html') renderCartPage();
   if (p === '/gallery' || p === '/gallery.html') renderGalleryPage();
+  if (p === '/ambiances' || p === '/ambiances/' || p === '/ambiances.html') renderAmbiancesPage();
   if (p === '/create-map' || p === '/create-map.html') initCreatorPage();
   if (p === '/account' || p === '/account.html') renderAccountPage();
   if (p === '/admin' || p === '/admin.html') renderAdminPage();
@@ -40,29 +46,25 @@ async function doRegister(e) {
   const name = document.getElementById('reg-name').value.trim();
   const email = document.getElementById('reg-email').value.trim();
   const password = document.getElementById('reg-password').value;
+  const confirmPasswordEl = document.getElementById('reg-password-confirm');
+  const confirmPassword = confirmPasswordEl ? confirmPasswordEl.value : '';
   const msgEl = document.getElementById('reg-msg');
+  if (!name || !email || !password || !confirmPassword) {
+    msgEl.innerHTML = '<div class="alert alert-error">Tous les champs sont requis</div>';
+    return;
+  }
+  if (password !== confirmPassword) {
+    msgEl.innerHTML = '<div class="alert alert-error">Les deux mots de passe ne correspondent pas</div>';
+    return;
+  }
   const res = await fetch('/api/auth/register', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'same-origin',
-    body: JSON.stringify({ name, email, password })
+    body: JSON.stringify({ name, email, password, confirmPassword })
   });
   const data = await res.json();
-  if (!res.ok) {
-    if (res.status === 409 && data.code === 'EMAIL_ALREADY_USED') {
-      if (typeof showTab === 'function') showTab('login');
-      var loginEmailEl = document.getElementById('login-email');
-      var loginMsgEl = document.getElementById('login-msg');
-      if (loginEmailEl) loginEmailEl.value = email;
-      if (loginMsgEl) {
-        loginMsgEl.innerHTML = '<div class="alert" style="background:rgba(61,186,120,.15);border:1px solid var(--success);color:var(--success)">Ce compte existe deja. Connectez-vous avec cet email.</div>';
-      }
-      msgEl.innerHTML = '';
-      return;
-    }
-    msgEl.innerHTML = '<div class="alert alert-error">' + (data.error || tr('ui.error', 'Erreur')) + '</div>';
-    return;
-  }
+  if (!res.ok) { msgEl.innerHTML = '<div class="alert alert-error">' + (data.error || tr('ui.error', 'Erreur')) + '</div>'; return; }
   if (data.emailVerificationSent) {
     msgEl.innerHTML = '<div class="alert" style="background:rgba(61,186,120,.15);border:1px solid var(--success);color:var(--success)">' + tr('ui.saved_account', 'Compte cree. Verifiez votre email pour activer votre connexion.') + '</div>';
     setTimeout(function() { window.location.href = '/login'; }, 1400);
@@ -143,19 +145,29 @@ async function doForgotPassword() {
 
 async function doResetPassword() {
   var pwdEl = document.getElementById('reset-password');
+  var pwdConfirmEl = document.getElementById('reset-password-confirm');
   var msgEl = document.getElementById('reset-msg');
-  if (!pwdEl || !msgEl) return;
+  if (!pwdEl || !msgEl || !pwdConfirmEl) return;
   var token = new URLSearchParams(window.location.search).get('token') || '';
   var password = pwdEl.value || '';
+  var confirmPassword = pwdConfirmEl.value || '';
   if (!token) {
     msgEl.innerHTML = '<div class="alert alert-error">' + tr('ui.invalid_link_token', 'Lien invalide (token manquant)') + '</div>';
+    return;
+  }
+  if (!password || !confirmPassword) {
+    msgEl.innerHTML = '<div class="alert alert-error">Tous les champs sont requis</div>';
+    return;
+  }
+  if (password !== confirmPassword) {
+    msgEl.innerHTML = '<div class="alert alert-error">Les deux mots de passe ne correspondent pas</div>';
     return;
   }
   var res = await fetch('/api/auth/reset-password', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'same-origin',
-    body: JSON.stringify({ token: token, password: password })
+    body: JSON.stringify({ token: token, password: password, confirmPassword: confirmPassword })
   });
   var data = await res.json();
   if (!res.ok) {
@@ -286,135 +298,8 @@ async function loadCart() {
   } catch(e) { return { items: [], total: 0 }; }
 }
 
-var ambianceSelectionResetTimer = null;
-function resetAmbianceSelectionState() {
-  try {
-    if (typeof window.clearAmbianceSelection === 'function') {
-      window.clearAmbianceSelection();
-      return;
-    }
-  } catch (e) {}
-
-  ['selectedAmbiances', 'selectedAmbianceIds', 'ambianceSelection'].forEach(function(key) {
-    var value = window[key];
-    if (Array.isArray(value)) {
-      value.length = 0;
-      return;
-    }
-    if (value && typeof value.clear === 'function') {
-      value.clear();
-      return;
-    }
-    if (value && typeof value === 'object') {
-      window[key] = {};
-    }
-  });
-
-  // Clear any other global ambiance selection containers from external scripts.
-  Object.keys(window).forEach(function(key) {
-    if (!/ambiance|selection/i.test(key)) return;
-    if (['sessionStorage', 'localStorage'].indexOf(key) >= 0) return;
-    var value = window[key];
-    if (Array.isArray(value)) {
-      value.length = 0;
-      return;
-    }
-    if (value && typeof value.clear === 'function') {
-      value.clear();
-      return;
-    }
-  });
-
-  // Reset persisted selection state if the Ambiances page stores it in Web Storage.
-  try {
-    if (window.sessionStorage) {
-      Object.keys(window.sessionStorage).forEach(function(k) {
-        if (/ambiance|selection/i.test(k)) window.sessionStorage.removeItem(k);
-      });
-    }
-  } catch (e) {}
-  try {
-    if (window.localStorage) {
-      Object.keys(window.localStorage).forEach(function(k) {
-        if (/ambiance|selection/i.test(k)) window.localStorage.removeItem(k);
-      });
-    }
-  } catch (e) {}
-
-  document.querySelectorAll(
-    '.ambiance-item.selected, .ambiance-card.selected, .ambiance-option.selected, [data-ambiance-id].selected'
-  ).forEach(function(el) {
-    el.classList.remove('selected');
-  });
-
-  document.querySelectorAll(
-    'input[type=\"checkbox\"][data-ambiance-id], input[type=\"checkbox\"][name*=\"ambiance\"], input[type=\"radio\"][name*=\"ambiance\"]'
-  ).forEach(function(input) {
-    input.checked = false;
-  });
-
-  ['selected-ambiance-count', 'ambiance-selected-count', 'ambianceSelectionCount'].forEach(function(id) {
-    var el = document.getElementById(id);
-    if (el) el.textContent = '0';
-  });
-}
-
-function scheduleAmbianceSelectionReset() {
-  if (ambianceSelectionResetTimer) clearTimeout(ambianceSelectionResetTimer);
-  ambianceSelectionResetTimer = setTimeout(function() {
-    resetAmbianceSelectionState();
-  }, 250);
-}
-
-function isAddAmbianceSelectionButton(el) {
-  if (!el) return false;
-  var node = el.closest ? el.closest('button, a') : null;
-  if (!node) return false;
-  var txt = String(node.textContent || '').toLowerCase();
-  return txt.indexOf('ajouter la selection au panier') >= 0
-    || txt.indexOf('ajouter la sélection au panier') >= 0;
-}
-
-function initAmbiancesSelectionGuards() {
-  if (window.location.pathname.indexOf('/ambiances') !== 0) return;
-
-  // Guard against repeated clicks that accumulate before UI reset.
-  document.addEventListener('click', function(e) {
-    if (!isAddAmbianceSelectionButton(e.target)) return;
-    var btn = e.target.closest('button, a');
-    if (btn && btn.tagName === 'BUTTON') {
-      btn.disabled = true;
-      setTimeout(function() { btn.disabled = false; }, 900);
-    }
-    setTimeout(function() {
-      resetAmbianceSelectionState();
-    }, 300);
-  }, true);
-
-  // Explicit fallback action requested by board: clear current selection.
-  setTimeout(function() {
-    var addBtn = Array.from(document.querySelectorAll('button, a')).find(function(el) {
-      return isAddAmbianceSelectionButton(el);
-    });
-    if (!addBtn) return;
-    if (document.getElementById('btn-clear-ambiance-selection')) return;
-
-    var clearBtn = document.createElement('button');
-    clearBtn.id = 'btn-clear-ambiance-selection';
-    clearBtn.type = 'button';
-    clearBtn.className = 'btn btn-ghost';
-    clearBtn.textContent = 'Effacer la selection';
-    clearBtn.style.marginTop = '8px';
-    clearBtn.onclick = function() {
-      resetAmbianceSelectionState();
-      showToast('Selection effacee');
-    };
-
-    addBtn.insertAdjacentElement('afterend', clearBtn);
-  }, 120);
-}
-
-async function addToCart(item) {
+async function addToCart(item, opts) {
+  opts = opts || {};
   const res = await fetch('/api/cart/items', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -424,22 +309,22 @@ async function addToCart(item) {
   if (res.ok) {
     cart = data.cart;
     updateCartCount();
-    if (item && item.type === 'ambiance') {
-      scheduleAmbianceSelectionReset();
-      if (window.location.pathname.indexOf('/ambiances') === 0) {
-        window.location.href = '/cart';
-        return;
-      }
-    }
-    showToast(tr('cart.toast.added', 'Ajoute au panier'));
+    if (!opts.silent) showToast(tr('cart.toast.added', 'Ajoute au panier'));
   } else {
-    showToast(data.error || tr('ui.error', 'Erreur'), 'error');
+    if (!opts.silent) showToast(data.error || tr('ui.error', 'Erreur'), 'error');
   }
+  return !!res.ok;
 }
 
 async function clearCart() {
   if (!confirm(tr('cart.confirm.clear', 'Vider entierement le panier?'))) return;
   await fetch('/api/cart', { method: 'DELETE', credentials: 'same-origin' });
+  try {
+    localStorage.removeItem(AMBIANCE_CART_KEY);
+    localStorage.removeItem(AMBIANCE_MAP_KEY);
+    localStorage.removeItem(AMBIANCE_STORAGE_KEY);
+  } catch (_) {}
+  ambianceSelection = [];
   cart = { items: [], total: 0 };
   renderCartPage();
   updateCartCount();
@@ -452,6 +337,67 @@ async function removeCartItem(id) {
   updateCartCount();
 }
 
+function getSelectedAmbiances() {
+  try {
+    var raw = localStorage.getItem(AMBIANCE_STORAGE_KEY);
+    var parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (_) {
+    return [];
+  }
+}
+
+function saveSelectedAmbiances(items) {
+  try { localStorage.setItem(AMBIANCE_STORAGE_KEY, JSON.stringify(items || [])); } catch (_) {}
+}
+
+function getCartAmbianceMap() {
+  try {
+    var raw = localStorage.getItem(AMBIANCE_MAP_KEY);
+    var parsed = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch (_) {
+    return {};
+  }
+}
+
+function saveCartAmbianceMap(map) {
+  try { localStorage.setItem(AMBIANCE_MAP_KEY, JSON.stringify(map || {})); } catch (_) {}
+}
+
+function computeAmbianceBundlePriceCents(count) {
+  if (count >= 10) return 999;
+  if (count >= 5) return 799;
+  if (count >= 1) return count * 199;
+  return 0;
+}
+
+function getCartAmbiances() {
+  try {
+    var raw = localStorage.getItem(AMBIANCE_CART_KEY);
+    var parsed = raw ? JSON.parse(raw) : { items: [], count: 0, totalPrice: 0 };
+    if (!parsed || typeof parsed !== 'object') return { items: [], count: 0, totalPrice: 0 };
+    if (!Array.isArray(parsed.items)) parsed.items = [];
+    if (!Number.isFinite(parsed.count)) parsed.count = parsed.items.length;
+    if (!Number.isFinite(parsed.totalPrice)) parsed.totalPrice = 0;
+    return parsed;
+  } catch (_) {
+    return { items: [], count: 0, totalPrice: 0 };
+  }
+}
+
+function saveCartAmbiances(payload) {
+  try { localStorage.setItem(AMBIANCE_CART_KEY, JSON.stringify(payload || { items: [], count: 0, totalPrice: 0 })); } catch (_) {}
+}
+
+function setCartItemAmbiance(itemId, ambianceId) {
+  var map = getCartAmbianceMap();
+  if (!ambianceId) delete map[itemId];
+  else map[itemId] = ambianceId;
+  saveCartAmbianceMap(map);
+  renderCartPage();
+}
+
 // CART PAGE
 async function renderCartPage() {
   const data = await loadCart();
@@ -459,24 +405,50 @@ async function renderCartPage() {
   const container = document.getElementById('cart-items');
   const summaryEl = document.getElementById('cart-summary');
   if (!container) return;
+  const allItems = data.items || [];
+  const mainItems = allItems.filter(function(item) { return item.type !== 'ambiance'; });
+  const ambianceCartItems = allItems.filter(function(item) { return item.type === 'ambiance'; });
+  const paidAmbianceCount = ambianceCartItems.filter(function(item) { return !item.isBonus; }).length;
+  const ambianceSubtotalCents = computeAmbianceBundlePriceCents(paidAmbianceCount);
 
-  if (!data.items || !data.items.length) {
+  var freeAmbianceCatalog = [];
+  try {
+    var manifestRes = await fetch('/ambiances/manifest.json', { cache: 'no-store' });
+    if (manifestRes.ok) {
+      var manifest = await manifestRes.json();
+      freeAmbianceCatalog = (manifest.tracks || []).map(function(track, index) {
+        var baseName = String(track.baseName || '').trim();
+        if (!baseName) return null;
+        var thumbExt = String(track.thumbExt || 'jpg').toLowerCase();
+        if (thumbExt !== 'jpg' && thumbExt !== 'jpeg' && thumbExt !== 'png') thumbExt = 'jpg';
+        return {
+          id: String(track.id || ('track-' + index)),
+          title: String(track.title || baseName.replace(/[_-]+/g, ' ').trim()),
+          thumbUrl: '/ambiances/' + encodeURIComponent(baseName + '.' + thumbExt)
+        };
+      }).filter(Boolean);
+    }
+  } catch (_) {}
+
+  function pickFreeAmbiance(item) {
+    if (!freeAmbianceCatalog.length) return null;
+    var key = String((item && item.id) || '') + '|' + String((item && item.type) || '');
+    var hash = 0;
+    for (var i = 0; i < key.length; i++) hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
+    return freeAmbianceCatalog[hash % freeAmbianceCatalog.length];
+  }
+
+  var hasMainItems = mainItems.length > 0;
+  if (!hasMainItems && !ambianceCartItems.length) {
     container.innerHTML = '<div class="cart-empty"><h3>' + tr('cart.empty.title', 'Panier vide') + '</h3><p>' + tr('cart.empty.subtitle', 'Parcourez nos cartes et photos.') + '</p><a href="/gallery" class="btn btn-ghost" style="margin-top:16px">' + tr('cart.empty.cta', 'Voir la galerie') + '</a></div>';
     if (summaryEl) summaryEl.style.display = 'none';
     return;
   }
 
-  container.innerHTML = data.items.map(function(item) {
+  container.innerHTML = hasMainItems ? mainItems.map(function(item) {
     var thumbHtml = '';
     if (item.type === 'sky_map') {
       thumbHtml = '<svg width="40" height="40" fill="none" stroke="#4a90d9" stroke-width="1.5"><circle cx="20" cy="20" r="18"/><circle cx="20" cy="20" r="4" fill="#4a90d9"/><circle cx="12" cy="14" r="1.5" fill="#aaccff"/><circle cx="28" cy="12" r="1" fill="#aaccff"/></svg>';
-    } else if (item.type === 'ambiance' || item.type === 'bonus_ambiance') {
-      var ambianceImg = (item.metadata && (item.metadata.backgroundImageUrl || item.metadata.imageUrl || item.metadata.thumbUrl)) || '';
-      if (ambianceImg) {
-        thumbHtml = '<img src="' + ambianceImg + '" alt="" style="width:100%;height:100%;object-fit:cover;display:block">';
-      } else {
-        thumbHtml = '<span style="font-size:1.3rem;color:#8fb2d9">♪</span>';
-      }
     } else {
       thumbHtml = '<div style="position:relative;width:100%;height:100%;">' +
         '<img src="/api/photos/' + (item.metadata && item.metadata.photoId || '') + '/thumb" alt="" style="width:100%;height:100%;object-fit:cover;display:block">' +
@@ -487,26 +459,56 @@ async function renderCartPage() {
     var extraInfo = '';
     if (item.type === 'sky_map' && item.metadata) {
       extraInfo = item.metadata.location_name + ' &bull; ' + item.metadata.date;
-    } else if (item.type === 'ambiance' || item.type === 'bonus_ambiance') {
-      extraInfo = tr('cart.ambiance', 'Ambiance');
+    }
+    var freeAmbianceInfo = '';
+    if (item.type === 'sky_map' || item.type === 'photo') {
+      var freeAmbiance = pickFreeAmbiance(item);
+      if (freeAmbiance) {
+        freeAmbianceInfo = '<div style="margin-top:8px;padding:8px;border:1px solid var(--border);border-radius:10px;background:rgba(61,186,120,.08)">' +
+          '<div style="font-size:.72rem;font-weight:700;letter-spacing:.03em;color:#3dba78;text-transform:uppercase">Ambiance gratuite incluse</div>' +
+          '<div style="display:flex;align-items:center;gap:8px;margin-top:6px">' +
+            '<img src="' + freeAmbiance.thumbUrl + '" alt="' + freeAmbiance.title + '" style="width:38px;height:38px;object-fit:cover;border-radius:8px;border:1px solid var(--border)" onerror="this.onerror=null;this.src=\'/images/sky-store-logo.jpg\'">' +
+            '<div style="font-size:.83rem;color:var(--text)">' + freeAmbiance.title + '</div>' +
+          '</div>' +
+        '</div>';
+      } else {
+        freeAmbianceInfo = '<div style="margin-top:8px;font-size:.8rem;color:#3dba78">Ambiance gratuite aleatoire incluse</div>';
+      }
     }
     // Nouvelle logique gratuite automatique: displayPrice=0 ou isFree=true = gratuit avec carte
     var isFree = item.isFree || item.displayPrice === 0;
     var priceText = isFree ? tr('cart.free_with_card', 'Gratuit avec carte') : '$' + ((item.displayPrice || item.price) / 100).toFixed(2);
     var freeBadge = isFree ? ' <span style="background:rgba(61,186,120,.15);color:#3dba78;padding:2px 8px;border-radius:10px;font-size:.7rem;margin-left:6px">' + tr('cart.free', 'GRATUIT') + '</span>' : '';
-    var canRemove = !item.autoGeneratedBonus && item.type !== 'bonus_ambiance';
-    var actionHtml = canRemove
-      ? '<button class="btn btn-danger btn-sm" onclick="event.stopPropagation();removeCartItem(\'' + item.id + '\')">' + tr('cart.remove', 'Supprimer') + '</button>'
-      : '<span style="font-size:.75rem;color:var(--text-muted)">' + tr('cart.auto_bonus', 'Bonus automatique') + '</span>';
     return '<div class="cart-item' + (isFree ? ' cart-item-bonus' : '') + '">' +
       '<div class="cart-item-thumb">' + thumbHtml + '</div>' +
-      '<div class="cart-item-info"><h4>' + item.title + '</h4><p>' + extraInfo + '</p>' + freeBadge + '</div>' +
+      '<div class="cart-item-info"><h4>' + item.title + '</h4><p>' + extraInfo + '</p>' + freeBadge + freeAmbianceInfo + '</div>' +
       '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px">' +
       '<span class="cart-item-price" style="color:' + (isFree ? '#3dba78' : 'inherit') + '">' + priceText + '</span>' +
-      actionHtml + '</div></div>';
-  }).join('');
+      '<button class="btn btn-danger btn-sm" onclick="event.stopPropagation();removeCartItem(\'' + item.id + '\')">' + tr('cart.remove', 'Supprimer') + '</button></div></div>';
+  }).join('') : '';
+
+  if (ambianceCartItems.length) {
+    container.innerHTML += '' +
+      '<div class="card" style="margin-top:18px;padding:16px">' +
+        '<h3 style="margin:0 0 6px 0">Ambiances ajoutees au panier</h3>' +
+        '<div style="font-size:.9rem;color:var(--text-muted);margin-bottom:10px">' + paidAmbianceCount + ' piste(s) &bull; ' + (ambianceSubtotalCents / 100).toFixed(2) + ' $</div>' +
+        '<div style="display:flex;gap:10px;flex-wrap:wrap">' +
+          ambianceCartItems.map(function(a) {
+            var thumb = (a.metadata && a.metadata.thumbUrl) ? a.metadata.thumbUrl : '/images/sky-store-logo.jpg';
+            return '<div style="width:92px;text-align:center">' +
+              '<img src="' + thumb + '" alt="' + a.title + '" style="width:92px;height:92px;object-fit:cover;border-radius:10px;border:1px solid var(--border)" onerror="this.onerror=null;this.src=\'/images/sky-store-logo.jpg\'">' +
+              '<div style="font-size:.7rem;color:var(--text-muted);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + a.title + '</div>' +
+            '</div>';
+          }).join('') +
+        '</div>' +
+      '</div>';
+  }
 
   if (summaryEl) {
+    if (!allItems.length) {
+      summaryEl.style.display = 'none';
+      return;
+    }
     summaryEl.style.display = 'block';
     var subtotal = data.total;
     var taxes = Math.round(subtotal * 0.14975);
@@ -515,8 +517,12 @@ async function renderCartPage() {
     if (data.freePhotoCount > 0) {
       freeInfo = '<div class="summary-row" style="color:#3dba78"><span>' + tr('cart.free_photos', '{count} photo(s) gratuite(s) avec carte', { count: data.freePhotoCount }) + '</span><span></span></div>';
     }
+    var ambianceInfo = ambianceSubtotalCents > 0
+      ? '<div class="summary-row"><span>Ambiances</span><span>$' + (ambianceSubtotalCents / 100).toFixed(2) + ' CAD</span></div>'
+      : '';
     summaryEl.innerHTML = '<h3>' + tr('cart.summary', 'Resume') + '</h3>' +
-      '<div class="summary-row"><span>' + tr('cart.subtotal', 'Sous-total') + '</span><span>$' + (subtotal / 100).toFixed(2) + ' CAD</span></div>' +
+      '<div class="summary-row"><span>' + tr('cart.subtotal', 'Sous-total') + '</span><span>$' + (data.total / 100).toFixed(2) + ' CAD</span></div>' +
+      ambianceInfo +
       freeInfo +
       '<div class="summary-row"><span>' + tr('cart.tax', 'TPS + TVQ (~15%)') + '</span><span>$' + (taxes / 100).toFixed(2) + ' CAD</span></div>' +
       '<div class="summary-row total"><span>' + tr('cart.total', 'Total') + '</span><span>$' + (total / 100).toFixed(2) + ' CAD</span></div>' +
@@ -1069,6 +1075,201 @@ async function addPhotoToCart() {
   modal.classList.remove('open');
 }
 
+function computeAmbiancePrice(count) {
+  if (count >= 10) return 9.99;
+  if (count >= 5) return 7.99;
+  if (count >= 1) return count * 1.99;
+  return 0;
+}
+
+function refreshAmbianceSummary() {
+  var selectedEl = document.getElementById('ambiance-selected-items');
+  var counterEl = document.getElementById('ambiance-counter');
+  var priceEl = document.getElementById('ambiance-price');
+  var addSelectionBtn = document.getElementById('ambiance-add-selection-cart');
+  if (!selectedEl || !counterEl || !priceEl) return;
+
+  var selectedItems = ambianceItems.filter(function(item) {
+    return ambianceSelection.indexOf(item.id) !== -1;
+  });
+
+  counterEl.textContent = selectedItems.length + ' / 10';
+  priceEl.textContent = computeAmbiancePrice(selectedItems.length).toFixed(2) + ' $';
+  if (addSelectionBtn) {
+    addSelectionBtn.disabled = selectedItems.length === 0;
+    addSelectionBtn.textContent = selectedItems.length
+      ? 'Ajouter la selection au panier (' + selectedItems.length + ')'
+      : 'Ajouter la selection au panier';
+  }
+
+  if (!selectedItems.length) {
+    saveSelectedAmbiances([]);
+    selectedEl.innerHTML = '<span style="color:var(--text-muted);font-size:.9rem">Aucune musique selectionnee.</span>';
+  } else {
+    saveSelectedAmbiances(selectedItems);
+    selectedEl.innerHTML = selectedItems.map(function(item) {
+      var pngThumb = item.thumbUrl.replace(/\.jpe?g$/i, '.png');
+      return '' +
+        '<div style="width:62px;text-align:center">' +
+          '<img src="' + item.thumbUrl + '" data-png-src="' + pngThumb + '" alt="' + item.title + '" onerror="if(this.dataset.tryPng!==\'1\'){this.dataset.tryPng=\'1\';this.src=this.dataset.pngSrc;return;}this.onerror=null;this.src=\'/images/sky-store-logo.jpg\'" style="width:62px;height:62px;object-fit:cover;border-radius:10px;border:1px solid var(--border)">' +
+          '<div style="margin-top:4px;font-size:.65rem;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + item.title + '</div>' +
+        '</div>';
+    }).join('');
+  }
+
+  document.querySelectorAll('.ambiance-add-btn').forEach(function(btn) {
+    var id = btn.dataset.ambianceId;
+    var isSelected = ambianceSelection.indexOf(id) !== -1;
+    var limitReached = ambianceSelection.length >= 10 && !isSelected;
+    btn.disabled = limitReached;
+    btn.textContent = isSelected ? 'Retirer' : 'Ajouter';
+    btn.className = 'btn btn-sm ' + (isSelected ? 'btn-ghost' : 'btn-primary') + ' ambiance-add-btn';
+  });
+}
+
+function toggleAmbianceSelection(id) {
+  var idx = ambianceSelection.indexOf(id);
+  if (idx !== -1) {
+    ambianceSelection.splice(idx, 1);
+  } else {
+    if (ambianceSelection.length >= 10) return;
+    ambianceSelection.push(id);
+  }
+  refreshAmbianceSummary();
+}
+
+async function addAmbianceToCartById(id) {
+  if (ambianceAddInFlight) return;
+
+  var selectedItems = ambianceItems.filter(function(item) {
+    return ambianceSelection.indexOf(item.id) !== -1;
+  });
+  if (!selectedItems.length) {
+    showToast('Selection vide', 'error');
+    return;
+  }
+
+  ambianceAddInFlight = true;
+  var addSelectionBtn = document.getElementById('ambiance-add-selection-cart');
+  if (addSelectionBtn) addSelectionBtn.disabled = true;
+
+  var okCount = 0;
+  try {
+    var selectionBatchId = 'amb_batch_' + Date.now() + '_' + Math.floor(Math.random() * 1000000);
+    for (var i = 0; i < selectedItems.length; i++) {
+      var item = selectedItems[i];
+      var ok = await addToCart({
+        type: 'ambiance',
+        title: item.title,
+        price: 199,
+        metadata: {
+          ambianceId: item.id,
+          ambianceBatchId: selectionBatchId,
+          thumbUrl: item.thumbUrl,
+          audioUrl: item.audioUrl,
+          duration: item.duration || '3:20'
+        }
+      }, { silent: true });
+      if (ok) okCount++;
+    }
+  } finally {
+    ambianceAddInFlight = false;
+    if (addSelectionBtn) addSelectionBtn.disabled = false;
+  }
+
+  if (!okCount) {
+    showToast('Erreur ajout panier', 'error');
+    return;
+  }
+  saveCartAmbiances({ items: [], count: 0, totalPrice: 0 });
+  // Hard reset after each "add selection" click so next pack starts from zero.
+  ambianceSelection = [];
+  saveSelectedAmbiances([]);
+  refreshAmbianceSummary();
+  showToast(okCount + ' ambiance(s) ajoutee(s) au panier');
+}
+
+async function renderAmbiancesPage() {
+  var grid = document.getElementById('ambiance-grid');
+  if (!grid) return;
+
+  var manifest = { tracks: [] };
+  try {
+    var res = await fetch('/ambiances/manifest.json', { cache: 'no-store' });
+    if (res.ok) manifest = await res.json();
+  } catch (_) {}
+
+  ambianceItems = (manifest.tracks || []).map(function(track, index) {
+    var baseName = String(track.baseName || '').trim();
+    var thumbExt = String(track.thumbExt || 'jpg').toLowerCase();
+    if (thumbExt !== 'jpg' && thumbExt !== 'jpeg' && thumbExt !== 'png') thumbExt = 'jpg';
+    return {
+      id: String(track.id || ('track-' + index)),
+      title: String(track.title || baseName.replace(/[_-]+/g, ' ').trim()),
+      duration: String(track.duration || '3:20'),
+      thumbUrl: '/ambiances/' + encodeURIComponent(baseName + '.' + thumbExt),
+      audioUrl: '/ambiances/' + encodeURIComponent(baseName + '.mp3')
+    };
+  }).filter(function(item) { return !!item.title; });
+
+  var preselected = getSelectedAmbiances();
+  ambianceSelection = preselected
+    .map(function(a) { return a.id; })
+    .filter(function(id) { return ambianceItems.some(function(it) { return it.id === id; }); });
+
+  if (!ambianceItems.length) {
+    grid.innerHTML = '<div class="card" style="padding:18px;color:var(--text-muted)">Aucune piste audio trouvee. Ajoutez des paires .mp3 + .jpg/.png dans /public/ambiances et declarez-les dans /public/ambiances/manifest.json.</div>';
+    refreshAmbianceSummary();
+    return;
+  }
+
+  grid.innerHTML = ambianceItems.map(function(item) {
+    var pngThumb = item.thumbUrl.replace(/\.jpe?g$/i, '.png');
+    return '' +
+      '<div class="photo-card">' +
+        '<div class="photo-thumb"><img src="' + item.thumbUrl + '" data-png-src="' + pngThumb + '" alt="' + item.title + '" loading="lazy" onerror="if(this.dataset.tryPng!==\'1\'){this.dataset.tryPng=\'1\';this.src=this.dataset.pngSrc;return;}this.onerror=null;this.src=\'/images/sky-store-logo.jpg\'"></div>' +
+        '<div class="photo-info" style="display:block">' +
+          '<strong style="display:block;margin-bottom:4px">' + item.title + '</strong>' +
+          '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px">' +
+            '<span style="color:var(--text-muted);font-size:.85rem">' + (item.duration || '3:20') + '</span>' +
+            '<button class="btn btn-primary btn-sm ambiance-add-btn" data-ambiance-id="' + item.id + '">Ajouter</button>' +
+          '</div>' +
+          '<audio controls preload="none" src="' + (item.audioUrl || '') + '" style="width:100%;margin-top:8px;height:30px"></audio>' +
+        '</div>' +
+      '</div>';
+  }).join('');
+
+  grid.querySelectorAll('.ambiance-add-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      toggleAmbianceSelection(btn.dataset.ambianceId);
+    });
+  });
+  var addSelectionBtn = document.getElementById('ambiance-add-selection-cart');
+  if (addSelectionBtn) {
+    addSelectionBtn.addEventListener('click', function() {
+      addAmbianceToCartById();
+    });
+    if (!document.getElementById('ambiance-clear-selection')) {
+      var clearBtn = document.createElement('button');
+      clearBtn.id = 'ambiance-clear-selection';
+      clearBtn.type = 'button';
+      clearBtn.className = 'btn btn-ghost';
+      clearBtn.style.marginTop = '8px';
+      clearBtn.textContent = 'Effacer la selection';
+      clearBtn.addEventListener('click', function() {
+        ambianceSelection = [];
+        saveSelectedAmbiances([]);
+        refreshAmbianceSummary();
+        showToast('Selection effacee');
+      });
+      addSelectionBtn.insertAdjacentElement('afterend', clearBtn);
+    }
+  }
+
+  refreshAmbianceSummary();
+}
+
+
 // ACCOUNT
 async function renderAccountPage() {
   if (!currentUser) { window.location.href = '/login'; return; }
@@ -1154,11 +1355,9 @@ async function loadOrders() {
       }
       return Promise.resolve(null);
     } else if (info.item.product_type === 'ambiance' || info.item.product_type === 'bonus_ambiance') {
-      var bgUrl = (info.item.metadata || {}).backgroundImageUrl || (info.item.metadata || {}).thumbUrl || (info.item.metadata || {}).imageUrl;
-      if (bgUrl) {
-        return Promise.resolve({ thumbUrl: bgUrl });
-      }
-      return Promise.resolve(null);
+      var thumbUrl = (info.item.metadata || {}).thumbUrl;
+      if (thumbUrl) return Promise.resolve({ thumbUrl: thumbUrl, audio: true });
+      return Promise.resolve({ audio: true });
     }
     return Promise.resolve(null);
   });
@@ -1197,10 +1396,11 @@ async function loadOrders() {
       }
 
       // Badge type
-      var typeLabel = 'Produit';
-      if (item.product_type === 'sky_map') typeLabel = 'Carte du ciel';
-      else if (item.product_type === 'photo' || item.product_type === 'bonus_photo') typeLabel = 'Photo';
-      else if (item.product_type === 'ambiance' || item.product_type === 'bonus_ambiance') typeLabel = 'Ambiance';
+      var typeLabel = item.product_type === 'sky_map'
+        ? 'Carte du ciel'
+        : (item.product_type === 'ambiance' || item.product_type === 'bonus_ambiance')
+          ? 'Ambiance sonore'
+          : 'Photo';
       var bonusTag = item.is_bonus ? ' <span style="background:rgba(61,186,120,.15);color:#3dba78;padding:2px 8px;border-radius:10px;font-size:.7rem;margin-left:6px">GRATUIT</span>' : '';
 
       // Statut
@@ -1215,7 +1415,7 @@ async function loadOrders() {
         if (item.product_type === 'sky_map') {
           actionHtml = '<a href="/api/download/' + token + '" class="btn btn-sm btn-primary" download>PNG</a>';
         } else if (item.product_type === 'ambiance' || item.product_type === 'bonus_ambiance') {
-          actionHtml = '<a href="/api/download/' + token + '" class="btn btn-sm btn-primary" download>Telecharger ambiance</a>';
+          actionHtml = '<a href="/api/download/' + token + '" class="btn btn-sm btn-primary" download>MP3</a>';
         } else {
           actionHtml = '<a href="/api/download/' + token + '" class="btn btn-sm btn-primary" download>Telecharger</a>';
         }
@@ -1223,7 +1423,7 @@ async function loadOrders() {
         if (item.product_type === 'sky_map') {
           actionHtml = '<a href="/api/download/' + token + '" class="btn btn-sm btn-ghost" style="opacity:.6" download>PNG</a>';
         } else if (item.product_type === 'ambiance' || item.product_type === 'bonus_ambiance') {
-          actionHtml = '<a href="/api/download/' + token + '" class="btn btn-sm btn-ghost" style="opacity:.5" download>Ambiance</a>';
+          actionHtml = '<a href="/api/download/' + token + '" class="btn btn-sm btn-ghost" style="opacity:.6" download>MP3</a>';
         } else {
           actionHtml = '<a href="/api/download/' + token + '" class="btn btn-sm btn-ghost" style="opacity:.5" download>Deja telecharge</a>';
         }
@@ -1481,11 +1681,14 @@ window.doForgotPassword = doForgotPassword;
 window.doResetPassword = doResetPassword;
 window.resendVerificationEmail = resendVerificationEmail;
 window.removeCartItem = removeCartItem;
+window.setCartItemAmbiance = setCartItemAmbiance;
 // selectBonusPhoto removed - function never existed (leftover from removed feature)
 window.selectBackground = selectBackground;
 window.filterGallery = filterGallery;
 window.openPhotoModal = openPhotoModal;
 window.addPhotoToCart = addPhotoToCart;
+window.addAmbianceToCartById = addAmbianceToCartById;
+window.toggleAmbianceSelection = toggleAmbianceSelection;
 window.markDelivered = markDelivered;
 window.deleteOrder = deleteOrder;
 window.loadAdminOrders = loadAdminOrders;

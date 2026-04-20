@@ -22,153 +22,13 @@ const { generateSkyMapPDF }       = require('./services/pdf-export');
 const { createCheckoutSession, getSessionStatus, constructWebhookEvent } = require('./services/stripe-service');
 const { sendEmail, orderConfirmationEmail } = require('./services/email-service');
 const gallery = require('./services/photo-gallery');
-const { applyTenantContext, DEFAULT_TENANT_ID } = require('./services/tenant-context');
-
-// Garde-fous process: eviter l'extinction silencieuse en cas d'erreur non attrapee.
-process.on('unhandledRejection', (reason) => {
-  console.error('[Process] unhandledRejection:', reason && reason.stack ? reason.stack : reason);
-});
-process.on('uncaughtException', (err) => {
-  console.error('[Process] uncaughtException:', err && err.stack ? err.stack : err);
-});
 
 // --- Variables d'environnement ---
 const PORT        = process.env.PORT || 3000;
 const NODE_ENV    = process.env.NODE_ENV || 'development';
 const STORAGE_PATH = process.env.STORAGE_PATH || path.join(__dirname, 'storage');
+const ADMIN_CODE   = process.env.ADMIN_CODE || 'admin123';
 const BASE_URL     = process.env.BASE_URL || `http://localhost:${PORT}`;
-const SESSION_SECRET = String(process.env.SESSION_SECRET || '').trim();
-const SESSION_COOKIE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 jours
-const SESSION_COOKIE_SECURE = NODE_ENV === 'production';
-const SESSION_COOKIE_SAME_SITE = SESSION_COOKIE_SECURE ? 'lax' : 'lax';
-
-if (!SESSION_SECRET) {
-  throw new Error('[Security] SESSION_SECRET manquant. Definissez SESSION_SECRET dans .env');
-}
-if (SESSION_SECRET === 'dev_secret_change_in_production' || SESSION_SECRET === 'change_this_to_a_random_string_in_production') {
-  throw new Error('[Security] SESSION_SECRET utilise une valeur de placeholder insecure. Remplacez-la par un secret fort.');
-}
-
-function normalizeOrigin(value) {
-  try {
-    return new URL(value).origin;
-  } catch (_) {
-    return null;
-  }
-}
-
-function parseAllowedOrigins(rawValue) {
-  return String(rawValue || '')
-    .split(',')
-    .map(v => v.trim())
-    .filter(Boolean)
-    .map(origin => {
-      const normalized = normalizeOrigin(origin);
-      if (!normalized) {
-        throw new Error(`[Security] CORS_ALLOWED_ORIGINS contient une origine invalide: ${origin}`);
-      }
-      return normalized;
-    });
-}
-
-const configuredCorsOrigins = parseAllowedOrigins(process.env.CORS_ALLOWED_ORIGINS);
-const devDefaultOrigins = Array.from(new Set([
-  normalizeOrigin(`http://localhost:${PORT}`),
-  normalizeOrigin(`http://127.0.0.1:${PORT}`)
-].filter(Boolean)));
-const fallbackOrigins = NODE_ENV === 'production' ? [] : devDefaultOrigins;
-const allowedCorsOrigins = Array.from(new Set([
-  ...(configuredCorsOrigins.length ? configuredCorsOrigins : fallbackOrigins),
-  ...devDefaultOrigins,
-  normalizeOrigin(BASE_URL)
-].filter(Boolean)));
-
-if (allowedCorsOrigins.length === 0) {
-  throw new Error('[Security] CORS_ALLOWED_ORIGINS manquant. Definissez les origines autorisees (CSV) pour cet environnement.');
-}
-
-function isTrustedOrigin(origin) {
-  const normalized = normalizeOrigin(origin);
-  if (!normalized) return false;
-  // En dev, ne pas bloquer les origines (tunnels/cloud IDE/domaines temporaires),
-  // sinon le checkout Stripe et les mutations panier deviennent fragiles.
-  if (NODE_ENV !== 'production') {
-    return true;
-  }
-  if (allowedCorsOrigins.includes(normalized)) return true;
-  return false;
-}
-
-const MUTATING_HTTP_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
-const PLACEHOLDER_MARKERS = ['YOUR_', 'CHANGE_ME', 'replace_me', 'placeholder'];
-
-function hasPlaceholderValue(rawValue) {
-  const value = String(rawValue || '').trim();
-  if (!value) return true;
-  return PLACEHOLDER_MARKERS.some(marker => value.includes(marker));
-}
-
-function validateProductionEnvPreflight() {
-  if (NODE_ENV !== 'production') return;
-
-  const errors = [];
-
-  if (SESSION_SECRET.length < 32) {
-    errors.push('SESSION_SECRET doit contenir au moins 32 caracteres en production.');
-  }
-
-  const baseUrlOrigin = normalizeOrigin(BASE_URL);
-  if (!baseUrlOrigin) {
-    errors.push('BASE_URL est invalide.');
-  } else if (!baseUrlOrigin.startsWith('https://')) {
-    errors.push('BASE_URL doit utiliser https en production.');
-  }
-
-  const stripeSecretKey = String(process.env.STRIPE_SECRET_KEY || '').trim();
-  if (hasPlaceholderValue(stripeSecretKey)) {
-    errors.push('STRIPE_SECRET_KEY manquant ou placeholder.');
-  } else if (stripeSecretKey.startsWith('sk_test_')) {
-    errors.push('STRIPE_SECRET_KEY de test detecte en production (attendu: sk_live_...).');
-  }
-
-  const webhookSecret = String(process.env.STRIPE_WEBHOOK_SECRET || '').trim();
-  if (hasPlaceholderValue(webhookSecret) || webhookSecret === 'whsec_YOUR_WEBHOOK_SECRET_HERE') {
-    errors.push('STRIPE_WEBHOOK_SECRET manquant ou placeholder.');
-  }
-
-  if (String(process.env.MOCK_STRIPE || '').trim().toLowerCase() === 'true') {
-    errors.push('MOCK_STRIPE=true interdit en production.');
-  }
-
-  const sendgridKey = String(process.env.SENDGRID_API_KEY || '').trim();
-  const smtpHost = String(process.env.SMTP_HOST || '').trim();
-  if (!sendgridKey && !smtpHost) {
-    errors.push('Aucun provider email configure (SENDGRID_API_KEY ou SMTP_HOST requis).');
-  }
-  if (sendgridKey && hasPlaceholderValue(sendgridKey)) {
-    errors.push('SENDGRID_API_KEY present mais placeholder.');
-  }
-  if (smtpHost && hasPlaceholderValue(smtpHost)) {
-    errors.push('SMTP_HOST present mais placeholder.');
-  }
-
-  if (errors.length > 0) {
-    throw new Error(`[Security] Production preflight invalide:\n- ${errors.join('\n- ')}`);
-  }
-}
-
-function getRequestOrigin(req) {
-  const directOrigin = normalizeOrigin(req.get('origin'));
-  if (directOrigin) {
-    return directOrigin;
-  }
-  return normalizeOrigin(req.get('referer'));
-}
-
-function hasSessionCookie(req) {
-  const rawCookieHeader = String(req.headers.cookie || '');
-  return rawCookieHeader.includes('sky.sid=');
-}
 
 function resolveSphereOptions(starDensity, showConstellationLabels) {
   const density = String(starDensity || 'normal').toLowerCase();
@@ -194,25 +54,13 @@ const Cart      = require('./routes/cart');
 const Orders    = require('./routes/orders');
 
 // --- App ---
-validateProductionEnvPreflight();
 const app = express();
 
 // ============================================================
 // MIDDLEWARE
 // ============================================================
 
-app.use(cors({
-  origin(origin, callback) {
-    if (!origin) {
-      // Autoriser les appels server-to-server / outils locaux sans header Origin.
-      return callback(null, true);
-    }
-    if (isTrustedOrigin(origin)) {
-      return callback(null, true);
-    }
-    return callback(new Error('CORS origin not allowed'));
-  }
-}));
+app.use(cors());
 
 // â”€â”€ Stripe Webhook â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Doit etre AVANT express.json() car Stripe a besoin du body brut pour verifier la signature
@@ -253,14 +101,8 @@ app.post('/api/webhook/stripe', express.raw({ type: 'application/json' }), async
       return res.status(200).json({ received: true });
     }
 
-    console.log('[Webhook] Finalisation workflow commande', order.id);
-    await Orders.runFinalizeOrderWorkflow({
-      orderId: order.id,
-      userId: order.user_id,
-      tenantId: order.tenant_id || DEFAULT_TENANT_ID,
-      correlationId: req.headers['x-request-id'] || req.headers['x-correlation-id'] || `stripe:${session.id}`,
-      source: 'stripe_webhook'
-    });
+    console.log('[Webhook] Finalisation de la commande', order.id);
+    await Orders.finalizeOrder(order.id, order.user_id);
   }
 
   res.status(200).json({ received: true });
@@ -281,43 +123,15 @@ app.use('/vendor/d3-lib', express.static(path.join(__dirname, 'node_modules/d3-c
 
 // Session (memory store pour dev, Redis recommended en prod)
 app.use(session({
-  name: 'sky.sid',
-  secret: SESSION_SECRET,
+  secret: process.env.SESSION_SECRET || 'dev_secret_change_in_production',
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: SESSION_COOKIE_SECURE,
-    sameSite: SESSION_COOKIE_SAME_SITE,
+    secure: NODE_ENV === 'production',
     httpOnly: true,
-    maxAge: SESSION_COOKIE_MAX_AGE_MS
+    maxAge: 7 * 24 * 60 * 60 * 1000 // 7 jours
   }
 }));
-
-// Resolution de contexte tenant (header/query/subdomain) + coherence session/API.
-app.use(applyTenantContext);
-
-// Protection CSRF basee sur l'origine: bloque les mutations API stateful hors origine autorisee.
-app.use((req, res, next) => {
-  if (!MUTATING_HTTP_METHODS.has(req.method)) {
-    return next();
-  }
-  if (!req.path.startsWith('/api/')) {
-    return next();
-  }
-  if (req.path === '/api/webhook/stripe') {
-    return next();
-  }
-  if (!hasSessionCookie(req)) {
-    // Requetes stateless (sans cookie de session): pas de surface CSRF exploitable ici.
-    return next();
-  }
-
-  const requestOrigin = getRequestOrigin(req);
-  if (!requestOrigin || !isTrustedOrigin(requestOrigin)) {
-    return res.status(403).json({ error: 'CSRF check failed: untrusted origin' });
-  }
-  return next();
-});
 
 // ============================================================
 // INIT
@@ -347,7 +161,10 @@ app.get('/choose-sky',    (req, res) => res.sendFile(path.join(templates, 'choos
 app.get('/build-map',     (req, res) => res.sendFile(path.join(templates, 'build-map.html')));
 app.get('/final-preview', (req, res) => res.sendFile(path.join(templates, 'final-preview.html')));
 app.get('/gallery',        (req, res) => res.sendFile(path.join(templates, 'gallery.html')));
-app.get('/cart',           (req, res) => res.sendFile(path.join(templates, 'cart.html')));
+app.get('/cart',           (req, res) => {
+  if (!req.session.userId) return res.redirect('/login?next=/cart');
+  res.sendFile(path.join(templates, 'cart.html'));
+});
 app.get('/checkout',       (req, res) => res.sendFile(path.join(templates, 'checkout.html')));
 app.get('/success',        (req, res) => res.sendFile(path.join(templates, 'success.html')));
 app.get('/cancel',         (req, res) => res.sendFile(path.join(templates, 'cancel.html')));
@@ -377,7 +194,6 @@ app.post('/api/auth/register',    Users.register);
 app.post('/api/auth/login',       Users.login);
 app.post('/api/auth/logout',      Users.logout);
 app.get('/api/auth/me',           Users.me);
-app.get('/api/auth/session',      Users.validateSession);
 app.get('/api/auth/verify-email', Users.verifyEmail);
 app.post('/api/auth/resend-verification', Users.resendVerification);
 app.post('/api/auth/forgot-password', Users.forgotPassword);

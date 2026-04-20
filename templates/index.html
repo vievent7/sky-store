@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sky Store — Cartes du Ciel Personalisees</title>
+  <title>Sky Store â€” Cartes du Ciel Personalisees</title>
   <link rel="stylesheet" href="/css/style.css">
   <link rel="stylesheet" href="/vendor/d3-celestial/celestial.css">
   <style>
@@ -63,7 +63,7 @@
     <div class="nav-links">
       <a href="/" class="active">Accueil</a>
       <a href="/choose-sky">Creer</a>
-      <a href="/gallery">Galerie</a>
+      <a href="/gallery">Galerie</a><a href="/ambiances">Ambiances</a>
       <a href="/cart" id="nav-cart">Panier <span id="cart-count" class="badge"></span></a>
       <a href="/account" id="nav-account">Mon compte</a>
     </div>
@@ -81,10 +81,11 @@
     <!-- Texte gauche -->
     <div>
       <h1 style="font-family:var(--font-title);font-size:clamp(2rem,4vw,3.2rem);line-height:1.15;margin-bottom:16px">Votre ciel,<br><span style="color:var(--accent2)">a votre date exacte</span></h1>
-      <p style="font-size:1.1rem;max-width:480px;color:rgba(232,238,248,.8);margin-bottom:24px">Créez une carte du ciel personnalisée pour la nuit qui compte le plus pour vous. Naissance, rencontre, fiançailles ou moment inoubliable.</p>
+      <p style="font-size:1.1rem;max-width:480px;color:rgba(232,238,248,.8);margin-bottom:24px">CrÃ©ez une carte du ciel personnalisÃ©e pour la nuit qui compte le plus pour vous. Naissance, rencontre, fianÃ§ailles ou moment inoubliable.</p>
       <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:36px">
         <a href="/choose-sky" class="btn btn-primary">Creer ma carte</a>
         <a href="/gallery" class="btn btn-ghost">Voir la galerie</a>
+        <a href="/ambiances" class="btn btn-ghost">Ambiances sonores</a>
       </div>
       <div style="display:flex;gap:36px;flex-wrap:wrap">
         <div><div style="font-size:1.8rem;font-family:var(--font-title);color:var(--accent2);font-weight:600">3 000+</div><div style="font-size:.85rem;color:var(--text-muted)">Cartes creees</div></div>
@@ -93,7 +94,7 @@
       </div>
     </div>
 
-    <!-- Sphère droite -->
+    <!-- SphÃ¨re droite -->
     <div class="home-hero-sphere-wrap" style="position:relative;width:594px;height:594px;flex-shrink:0;background:transparent;border-radius:12px;border:1px solid rgba(74,144,217,.2);box-shadow:0 0 60px rgba(74,144,217,.1);overflow:hidden;">
       <div id="home-celestial-sphere" style="position:absolute;inset:0;width:100%;height:100%;"></div>
     </div>
@@ -120,6 +121,11 @@
         <div class="step-num">03</div>
         <h3>Recevez +1 gratuite</h3>
         <p>Pour chaque carte achetee, recevez une photo astrophotographie de votre choix. Offert.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">04</div>
+        <h3>Ambiance aleatoire offerte</h3>
+        <p>Pour tout achat d'une carte personnalisee ou d'une photo de la galerie, recevez une ambiance aleatoire gratuite.</p>
       </div>
     </div>
   </div>
@@ -149,6 +155,10 @@
           <li>
             <svg width="20" height="20" fill="none" stroke="#4a90d9" stroke-width="2"><polyline points="20,6 9,17 4,12"/></svg>
             +1 photo astro gratuite avec chaque achat
+          </li>
+          <li>
+            <svg width="20" height="20" fill="none" stroke="#4a90d9" stroke-width="2"><polyline points="20,6 9,17 4,12"/></svg>
+            +1 ambiance aleatoire gratuite avec chaque achat
           </li>
         </ul>
         <a href="/choose-sky" class="btn btn-primary">Commencer maintenant</a>
@@ -188,7 +198,7 @@
       </div>
       <div class="bonus-text">
         <h2>1 photo astrophotographie offerte</h2>
-        <p>Pour chaque carte du ciel achetee, choisissez parmi notre galerie et recevez votre photo en haute resolution. Un cadeau qui ne cote rien de plus.</p>
+        <p>Pour chaque carte du ciel achetee, choisissez parmi notre galerie et recevez votre photo en haute resolution. Une ambiance aleatoire gratuite est egalement offerte.</p>
         <a href="/choose-sky" class="btn btn-primary">Creez votre carte + obtenez 1 photo gratuite</a>
       </div>
     </div>
@@ -200,18 +210,18 @@
   <div class="container footer-inner">
     <div class="footer-brand">
       <strong>Sky Store</strong>
-      <p>Vos cartes du ciel personnalisées</p>
+      <p>Vos cartes du ciel personnalisÃ©es</p>
     </div>
     <div class="footer-links">
       <a href="/choose-sky">Creer ma carte</a>
-      <a href="/gallery">Galerie</a>
+      <a href="/gallery">Galerie</a><a href="/ambiances">Ambiances</a>
       <a href="/cart">Panier</a>
       <a href="/account">Mon compte</a>
       <a href="/cgu">CGU</a>
-      <a href="/privacy">Confidentialité</a>
+      <a href="/privacy">ConfidentialitÃ©</a>
     </div>
     <div class="footer-legal">
-      <small>&copy; 2026 Sky Store. Tous droits réservés.</small>
+      <small>&copy; 2026 Sky Store. Tous droits rÃ©servÃ©s.</small>
     </div>
   </div>
 </footer>
@@ -381,6 +391,7 @@
 </script>
 </body>
 </html>
+
 
 
 

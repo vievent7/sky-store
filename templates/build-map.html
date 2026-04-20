@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Construire votre carte — Sky Store</title>
+  <title>Construire votre carte â€” Sky Store</title>
   <link rel="stylesheet" href="/css/style.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -204,7 +204,7 @@
       <a href="/">Accueil</a>
       <a href="/choose-sky">Choisir le ciel</a>
       <a href="/build-map">Construire</a>
-      <a href="/gallery">Galerie</a>
+      <a href="/gallery">Galerie</a><a href="/ambiances">Ambiances</a>
       <a href="/cart">Panier <span id="cart-count" class="badge"></span></a>
     </div>
   </div>
@@ -398,7 +398,7 @@
 
 <script>
 // ============================================================
-// BUILD MAP — Step 2
+// BUILD MAP â€” Step 2
 // ============================================================
 
 (function loadSourceImage() {
@@ -532,13 +532,13 @@ function addBgOption(containerId, id, thumbUrl, fullUrl) {
     var photos = results[0];
     var cardBgs = results[1];
 
-    // Photos premium — dans la colonne de gauche
+    // Photos premium â€” dans la colonne de gauche
     var list = Array.isArray(photos) ? photos : Object.values(photos || {});
     list.forEach(function(p) {
       if (p && p.id) addBgOption('bg-options-premium', p.id, p.thumbUrl, p.imageUrl);
     });
 
-    // Fonds de carte — dans la colonne de droite
+    // Fonds de carte â€” dans la colonne de droite
     var bgList = cardBgs.backgrounds || [];
     bgList.forEach(function(b) {
       if (b && b.id) addBgOption('bg-options-cardbacks', b.id, b.thumbUrl, b.fullUrl);
@@ -611,14 +611,14 @@ function renderPreviewCard() {
   var date = sessionStorage.getItem('sky_date') || '';
   var time = sessionStorage.getItem('sky_time') || '';
   var location = sessionStorage.getItem('sky_location') || '';
-  var footerLine = [date + (time ? ' ' + time : ''), location].filter(Boolean).join('  ·  ');
+  var footerLine = [date + (time ? ' ' + time : ''), location].filter(Boolean).join('  Â·  ');
 
   var html;
   var hasBg = !!selectedBg;
 
   if (isVert) {
     // =============================================
-    // VERTICAL — portrait premium
+    // VERTICAL â€” portrait premium
     // =============================================
     var cardW = 340, cardH = 520;
     var r = 116;
@@ -679,13 +679,13 @@ function renderPreviewCard() {
 
   } else {
     // =============================================
-    // HORIZONTAL — affiche paysage premium
+    // HORIZONTAL â€” affiche paysage premium
     // Layout: cercle a gauche, texte a droite
     // =============================================
     var cardW = 640, cardH = 340;
     var r = 130;                              // rayon cercle
     var cy = cardH / 2;                      // cercle centre verticalement
-    var leftEnd = cardH + 10;                // fin zone cercle (dépasse un peu)
+    var leftEnd = cardH + 10;                // fin zone cercle (dÃ©passe un peu)
     var textX = leftEnd + 32;                 // depart texte
     var textW = cardW - textX - 24;          // largeur texte disponible
     var midY = cardH / 2;                    // milieu vertical pour centrage texte
@@ -833,7 +833,7 @@ function initFormFromParams() {
 }
 
 // ============================================================
-// SESSION CHECK (remplace step1Done serveur — sessionStorage persiste apres restart)
+// SESSION CHECK (remplace step1Done serveur â€” sessionStorage persiste apres restart)
 // ============================================================
 (function checkSession() {
   if (!sessionStorage.getItem('sky_capture')) {
@@ -1002,10 +1002,11 @@ function goToFinalPreview() {
 }
 </script>
 <footer><div class="container footer-inner"><div class="footer-brand"><strong>Sky Store</strong></div>
-  <div class="footer-links"><a href="/">Accueil</a><a href="/gallery">Galerie</a><a href="/cgu">CGU</a><a href="/privacy">Confidentialité</a><a href="/account">Mon compte</a></div>
-  <div class="footer-legal"><small>&copy; 2026 Sky Store. Tous droits réservés.</small></div></div></footer>
+  <div class="footer-links"><a href="/">Accueil</a><a href="/gallery">Galerie</a><a href="/ambiances">Ambiances</a><a href="/cgu">CGU</a><a href="/privacy">ConfidentialitÃ©</a><a href="/account">Mon compte</a></div>
+  <div class="footer-legal"><small>&copy; 2026 Sky Store. Tous droits rÃ©servÃ©s.</small></div></div></footer>
 </body>
 </html>
+
 
 
 

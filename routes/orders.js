@@ -40,51 +40,81 @@ const path = require('path');
 const fs = require('fs');
 const { db } = require('../services/database');
 const { getCartDb } = require('./cart');
-const { createCheckoutSession, getSessionStatus, VALID_PRICES } = require('../services/stripe-service');
+const { createCheckoutSession, getSessionStatus } = require('../services/stripe-service');
 const { captureCardPngFromHtml } = require('../services/html-screenshot');
 const { sendEmail, orderConfirmationEmail } = require('../services/email-service');
 const gallery = require('../services/photo-gallery');
-const {
-  calculateAmbiancePriceDistribution,
-  extractAmbianceKeyFromMetadata,
-  selectBonusAmbiances
-} = require('../services/ambiance-pricing');
 const { renderSkyMap } = require('../services/sky-map-gen');
 const { getSkyData } = require('../services/astro-engine');
-const workflowRuntime = require('../services/workflow-runtime');
-const { DEFAULT_TENANT_ID } = require('../services/tenant-context');
 
 const TAX_RATE = 0.14975;
-const FINALIZE_WORKFLOW_TYPE = 'order.finalize';
-let finalizeWorkflowRegistered = false;
 
-function registerFinalizeWorkflow() {
-  if (finalizeWorkflowRegistered) return;
-  workflowRuntime.registerHandler(FINALIZE_WORKFLOW_TYPE, async (payload, context) => {
-    await finalizeOrder(payload.orderId, payload.userId);
-    return {
-      orderId: payload.orderId,
-      tenantId: payload.tenantId,
-      correlationId: context.correlationId
-    };
-  });
-  finalizeWorkflowRegistered = true;
+function ambianceBundleTotal(count) {
+  if (count >= 10) return 999;
+  if (count >= 5) return 799;
+  return count * 199;
 }
 
-async function runFinalizeOrderWorkflow({ orderId, userId, tenantId, correlationId, source }) {
-  registerFinalizeWorkflow();
-  return workflowRuntime.enqueueAndRun({
-    type: FINALIZE_WORKFLOW_TYPE,
-    tenantId: tenantId || DEFAULT_TENANT_ID,
-    correlationId: correlationId || '',
-    maxAttempts: 2,
-    payload: {
-      orderId,
-      userId,
-      tenantId: tenantId || DEFAULT_TENANT_ID,
-      source: source || 'unknown'
-    }
-  });
+function getAmbianceBatchKey(item, index) {
+  const meta = item && item.metadata && typeof item.metadata === 'object' ? item.metadata : {};
+  const explicit = typeof meta.ambianceBatchId === 'string' ? meta.ambianceBatchId.trim() : '';
+  if (explicit) return explicit;
+  // Legacy items without batch id stay isolated per line to avoid wrong regrouping.
+  return `legacy_single_${index}`;
+}
+
+function loadAmbianceCatalog() {
+  try {
+    const manifestPath = path.join(__dirname, '..', 'public', 'ambiances', 'manifest.json');
+    if (!fs.existsSync(manifestPath)) return [];
+    const raw = fs.readFileSync(manifestPath, 'utf8').replace(/^\uFEFF/, '');
+    const manifest = JSON.parse(raw);
+    return (manifest.tracks || []).map((track, index) => {
+      const baseName = String(track.baseName || '').trim();
+      if (!baseName) return null;
+      let thumbExt = String(track.thumbExt || 'jpg').toLowerCase();
+      if (!['jpg', 'jpeg', 'png'].includes(thumbExt)) thumbExt = 'jpg';
+      return {
+        id: String(track.id || ('track-' + index)),
+        title: String(track.title || baseName.replace(/[_-]+/g, ' ').trim()),
+        duration: String(track.duration || '3:20'),
+        audioUrl: '/ambiances/' + encodeURIComponent(baseName + '.mp3'),
+        thumbUrl: '/ambiances/' + encodeURIComponent(baseName + '.' + thumbExt)
+      };
+    }).filter(Boolean);
+  } catch (_) {
+    return [];
+  }
+}
+
+function pickAmbianceFromCatalog(catalog, seedValue) {
+  if (!catalog || !catalog.length) return null;
+  const seed = String(seedValue || Math.random());
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
+  return catalog[hash % catalog.length];
+}
+
+function resolveAmbianceAudioPath(audioUrl) {
+  const raw = String(audioUrl || '');
+  if (!raw) return null;
+  const relativeRaw = raw.startsWith('/') ? raw.replace(/^\//, '') : raw;
+  const candidates = [relativeRaw];
+  try { candidates.push(decodeURIComponent(relativeRaw)); } catch (_) {}
+  try { candidates.push(decodeURIComponent(decodeURIComponent(relativeRaw))); } catch (_) {}
+  for (const rel of candidates) {
+    const full = path.join(__dirname, '..', 'public', rel);
+    if (fs.existsSync(full)) return full;
+  }
+  // Fallback robuste: retrouver le fichier dans /public/ambiances par son basename decode.
+  try {
+    const ambianceDir = path.join(__dirname, '..', 'public', 'ambiances');
+    const decodedBase = path.basename(decodeURIComponent(relativeRaw));
+    const files = fs.readdirSync(ambianceDir);
+    const found = files.find(f => f === decodedBase);
+    if (found) return path.join(ambianceDir, found);
+  } catch (_) {}
+  return null;
 }
 
 function isLegacySkyMapItem(meta) {
@@ -102,112 +132,6 @@ function resolveCanonicalCleanPath(meta, fallbackItemId, storagePath) {
   }
   const cardId = meta.cardPreviewId || ('card_' + fallbackItemId);
   return path.join(storagePath, 'private', cardId + '_clean.html');
-}
-
-function resolveFilePathFromMetadata(item, meta, storagePath) {
-  const STORAGE_PATH = storagePath || path.join(__dirname, '..', 'storage');
-  const PUBLIC_PATH = path.join(__dirname, '..', 'public');
-  const AMBIANCE_PUBLIC_DIR = path.join(PUBLIC_PATH, 'images-gallery', 'card-backgrounds');
-  const candidates = [
-    meta.filePath,
-    meta.downloadFilePath,
-    meta.audioPath,
-    meta.ambiancePath,
-    meta.imagePath,
-    meta.pdfPath
-  ].filter(v => typeof v === 'string' && v.trim());
-
-  const urlCandidates = [
-    meta.backgroundImageUrl,
-    meta.imageUrl,
-    meta.thumbUrl,
-    meta.url
-  ].filter(v => typeof v === 'string' && v.trim());
-
-  for (const candidate of candidates) {
-    if (path.isAbsolute(candidate) && fs.existsSync(candidate)) return candidate;
-    if (candidate.startsWith('/storage/')) {
-      const rel = candidate.replace(/^\/storage\/+/, '');
-      const abs = path.join(STORAGE_PATH, rel);
-      if (fs.existsSync(abs)) return abs;
-    }
-    if (candidate.startsWith('/')) {
-      const rel = candidate.replace(/^\/+/, '');
-      const abs = path.join(PUBLIC_PATH, rel);
-      if (fs.existsSync(abs)) return abs;
-    }
-    const ambienceAbs = path.join(AMBIANCE_PUBLIC_DIR, candidate);
-    if (fs.existsSync(ambienceAbs)) return ambienceAbs;
-  }
-
-  for (const u of urlCandidates) {
-    if (!u.startsWith('/')) continue;
-    const rel = u.replace(/^\/+/, '');
-    const abs = path.join(PUBLIC_PATH, rel);
-    if (fs.existsSync(abs)) return abs;
-  }
-
-  if ((item.product_type === 'ambiance' || item.product_type === 'bonus_ambiance') && typeof meta.ambianceId === 'string') {
-    const byId = path.join(AMBIANCE_PUBLIC_DIR, meta.ambianceId);
-    if (fs.existsSync(byId)) return byId;
-  }
-  return null;
-}
-
-function resolveExpectedItemPrice(item) {
-  if (item.isBonus) return VALID_PRICES.bonus_photo;
-  if (item.type === 'sky_map') return VALID_PRICES.sky_map;
-  if (item.type === 'bonus_photo') return VALID_PRICES.bonus_photo;
-  if (item.type === 'bonus_ambiance') return 0;
-  if (item.type === 'ambiance') {
-    const price = Number(item.price);
-    return Number.isFinite(price) && price >= 0 ? Math.round(price) : 199;
-  }
-  if (item.type === 'photo') {
-    const photoId = item.metadata && item.metadata.photoId;
-    const photo = photoId ? gallery.getPhoto(photoId) : null;
-    if (!photo || !Number.isFinite(photo.price) || photo.price < 0) return null;
-    return Math.round(photo.price);
-  }
-  return null;
-}
-
-function normalizeAndValidateCheckoutItems(items) {
-  const normalizedItems = [];
-  const mismatches = [];
-
-  for (const item of items) {
-    const expectedPrice = resolveExpectedItemPrice(item);
-    if (!Number.isFinite(expectedPrice)) {
-      mismatches.push({
-        type: item.type || 'unknown',
-        received: Number(item.price),
-        expected: null,
-        reason: 'price_unresolvable'
-      });
-      continue;
-    }
-
-    const receivedPrice = Number(item.price);
-    if (receivedPrice !== expectedPrice) {
-      mismatches.push({
-        type: item.type || 'unknown',
-        received: Number.isFinite(receivedPrice) ? receivedPrice : null,
-        expected: expectedPrice,
-        reason: 'price_mismatch'
-      });
-    }
-
-    normalizedItems.push({
-      ...item,
-      price: expectedPrice,
-      quantity: Number.isFinite(Number(item.quantity)) && Number(item.quantity) > 0
-        ? Math.floor(Number(item.quantity))
-        : 1
-    });
-  }
-
-  return { normalizedItems, mismatches };
 }
 
 // ============================================================
@@ -266,263 +190,226 @@ ${inlineSvg ? `<img src="data:image/svg+xml;base64,${inlineSvg}" style="position
 
 async function createCheckout(req, res) {
   try {
-    const userId = req.session.userId || null;
-    const tenantId = req.tenantId || req.session?.tenantId || DEFAULT_TENANT_ID;
-    const guestEmail = String(req.body?.customerEmail || '').trim().toLowerCase();
-    const guestName = String(req.body?.customerName || '').trim();
-    let cartItems = [];
+  const userId = req.session.userId || null;
+  const guestEmail = String(req.body?.customerEmail || '').trim().toLowerCase();
+  const guestName = String(req.body?.customerName || '').trim();
+  let cartItems = [];
 
-    if (userId) {
-      // Utiliser le panier DB pour les utilisateurs connectes
-      cartItems = await getCartDb(userId);
-    } else {
-      cartItems = (req.session.cart || { items: [] }).items || [];
-    }
+  if (userId) {
+    // Utiliser le panier DB pour les utilisateurs connectes
+    cartItems = await getCartDb(userId);
+  } else {
+    cartItems = (req.session.cart || { items: [] }).items || [];
+  }
 
-    if (!cartItems.length) {
-      return res.status(400).json({ error: 'Panier vide' });
-    }
-    console.log('[checkout][debug] incoming', {
-      userId,
-      tenantId,
-      sessionId: req.sessionID || null,
-      cartCount: cartItems.length,
-      cartItems: cartItems.map(i => ({
-        id: i.id,
-        type: i.type,
-        title: i.title,
-        price: i.price,
-        quantity: i.quantity || 1,
-        isBonus: !!i.isBonus,
-        hasMetadata: !!i.metadata
-      }))
-    });
+  if (!cartItems.length) {
+    return res.status(400).json({ error: 'Panier vide' });
+  }
 
-    const normalizedCart = normalizeAndValidateCheckoutItems(cartItems);
-    if (normalizedCart.mismatches.length > 0) {
-      console.warn('[checkout] Validation prix refusee', {
-        user: userId ? 'authenticated' : 'guest',
-        mismatchCount: normalizedCart.mismatches.length,
-        mismatches: normalizedCart.mismatches.map(m => ({
-          type: m.type,
-          expected: m.expected,
-          received: m.received,
-          reason: m.reason
-        }))
-      });
-      return res.status(400).json({
-        error: 'Panier invalide: montants incoherents detectes. Rafraichissez le panier et reessayez.'
-      });
-    }
-    cartItems = normalizedCart.normalizedItems;
+  const BASE_URL = process.env.BASE_URL || `http://localhost:${process.env.PORT || 3000}`;
 
-    const BASE_URL = process.env.BASE_URL || `http://localhost:${process.env.PORT || 3000}`;
+  // Obtenir l'email client
+  let customerEmail = null;
+  let customerName = null;
+  if (userId) {
+    const s1 = await db.prepare('SELECT email, name FROM users WHERE id = ?');
+    const user = s1.get(userId);
+    customerEmail = user?.email;
+    customerName = user?.name || null;
+  } else if (guestEmail) {
+    customerEmail = guestEmail;
+    customerName = guestName || null;
+  }
 
-    // Obtenir l'email client
-    let customerEmail = null;
-    let customerName = null;
-    if (userId) {
-      const s1 = await db.prepare('SELECT email, name FROM users WHERE id = ?');
-      const user = s1.get(userId);
-      customerEmail = user?.email;
-      customerName = user?.name || null;
-    } else if (guestEmail) {
-      customerEmail = guestEmail;
-      customerName = guestName || null;
-    }
-
-    // Verifier les credits bonus
-    let bonusCreditsAvailable = 0;
-    if (userId) {
-      const s2 = await db.prepare(`
+  // Verifier les credits bonus
+  let bonusCreditsAvailable = 0;
+  if (userId) {
+    const s2 = await db.prepare(`
       SELECT COALESCE(SUM(free_photo_credit), 0) as c
       FROM orders WHERE user_id = ? AND status = 'delivered'
     `);
-      const credits = s2.get(userId);
-      bonusCreditsAvailable = credits?.c || 0;
+    const credits = s2.get(userId);
+    bonusCreditsAvailable = credits?.c || 0;
+  }
+
+  const stripeItems = [];
+  const bonusPhotoItems = [];
+  let bonusCreditUsed = 0;
+  const skyMapsInCart = cartItems.filter(i => i.type === 'sky_map').length;
+  const cartPhotoCount = cartItems.filter(i => i.type === 'photo' && !i.isBonus).length;
+  let autoFreePhotosRemaining = Math.min(skyMapsInCart, cartPhotoCount);
+
+  for (const item of cartItems) {
+    if (item.type === 'photo' && !item.isBonus && autoFreePhotosRemaining > 0) {
+      autoFreePhotosRemaining--;
+      bonusPhotoItems.push({
+        ...item,
+        type: 'bonus_photo',
+        isBonus: true,
+        price: 0,
+        metadata: { ...(item.metadata || {}), autoFreePhoto: true }
+      });
+    } else if (item.isBonus) {
+      if (bonusCreditsAvailable > bonusCreditUsed) bonusCreditUsed++;
+      bonusPhotoItems.push({
+        ...item,
+        type: 'bonus_photo',
+        isBonus: true,
+        price: 0
+      });
+    } else {
+      stripeItems.push({
+        productId: item.id,
+        type: item.type,
+        title: item.title,
+        price: item.price,
+        quantity: item.quantity || 1,
+        metadata: item.metadata || {}
+      });
     }
+  }
 
-    const stripeItems = [];
-    const bonusPhotoItems = [];
-    let bonusCreditUsed = 0;
-    const skyMapsInCart = cartItems.filter(i => i.type === 'sky_map').length;
-    const cartPhotoCount = cartItems.filter(i => i.type === 'photo' && !i.isBonus).length;
-    let autoFreePhotosRemaining = Math.min(skyMapsInCart, cartPhotoCount);
+  const paidAmbianceGroups = new Map();
+  for (let i = 0; i < stripeItems.length; i++) {
+    const item = stripeItems[i];
+    if (item.type !== 'ambiance') continue;
+    const groupKey = getAmbianceBatchKey(item, i);
+    if (!paidAmbianceGroups.has(groupKey)) paidAmbianceGroups.set(groupKey, []);
+    paidAmbianceGroups.get(groupKey).push(item);
+  }
+  for (const [groupKey, groupItems] of paidAmbianceGroups.entries()) {
+    const bundle = ambianceBundleTotal(groupItems.length);
+    for (let i = 0; i < groupItems.length; i++) {
+      const item = groupItems[i];
+      item.price = i === 0 ? bundle : 0;
+      item.metadata = {
+        ...(item.metadata || {}),
+        ambianceBundleApplied: true,
+        ambianceBundleCount: groupItems.length,
+        ambianceBundleTotal: bundle,
+        ambianceBundleGroup: groupKey
+      };
+    }
+  }
 
-    for (const item of cartItems) {
-      if (item.type === 'photo' && !item.isBonus && autoFreePhotosRemaining > 0) {
-        autoFreePhotosRemaining--;
-        bonusPhotoItems.push({
-          ...item,
-          type: 'bonus_photo',
-          isBonus: true,
-          price: 0,
-          metadata: { ...(item.metadata || {}), autoFreePhoto: true }
-        });
-      } else if (item.isBonus) {
-        if (bonusCreditsAvailable > bonusCreditUsed) bonusCreditUsed++;
-        bonusPhotoItems.push({
-          ...item,
-          type: 'bonus_photo',
-          isBonus: true,
-          price: 0
-        });
-      } else {
-        stripeItems.push({
-          productId: item.id,
-          type: item.type,
-          title: item.title,
-          price: item.price,
-          quantity: item.quantity || 1,
-          metadata: item.metadata || {}
-        });
+  const paidAndBonusItems = [
+    ...stripeItems.map(i => ({ ...i, quantity: i.quantity || 1 })),
+    ...bonusPhotoItems.map(i => ({ ...i, price: 0, quantity: 1, isBonus: true }))
+  ];
+
+  const ambianceCatalog = loadAmbianceCatalog();
+  const selectedAmbianceIds = new Set(
+    paidAndBonusItems
+      .filter(i => i.type === 'ambiance')
+      .map(i => String((i.metadata && i.metadata.ambianceId) || '').trim())
+      .filter(Boolean)
+  );
+  const ambianceCatalogWithoutSelection = ambianceCatalog.filter(a => !selectedAmbianceIds.has(String(a.id)));
+  const freeAmbiancePool = ambianceCatalogWithoutSelection.length ? ambianceCatalogWithoutSelection : ambianceCatalog;
+  const freeAmbiancePoolUnique = freeAmbiancePool.slice();
+  const eligibleForFreeAmbiance = paidAndBonusItems.filter(i =>
+    i.type === 'sky_map' || i.type === 'photo' || i.type === 'bonus_photo'
+  );
+  const bonusAmbianceItems = [];
+  for (let i = 0; i < eligibleForFreeAmbiance.length; i++) {
+    const src = eligibleForFreeAmbiance[i];
+    const poolForPick = freeAmbiancePoolUnique.length ? freeAmbiancePoolUnique : freeAmbiancePool;
+    const ambiance = pickAmbianceFromCatalog(
+      poolForPick,
+      `${Date.now()}-${src.type}-${src.productId || src.title || i}-${i}`
+    );
+    if (!ambiance) continue;
+    if (freeAmbiancePoolUnique.length) {
+      const idx = freeAmbiancePoolUnique.findIndex(a => String(a.id) === String(ambiance.id));
+      if (idx !== -1) freeAmbiancePoolUnique.splice(idx, 1);
+    }
+    bonusAmbianceItems.push({
+      productId: 'free_amb_' + i + '_' + Date.now(),
+      type: 'bonus_ambiance',
+      title: 'Ambiance offerte - ' + ambiance.title,
+      price: 0,
+      quantity: 1,
+      isBonus: true,
+      metadata: {
+        autoFreeAmbiance: true,
+        grantedForType: src.type,
+        grantedForProductId: src.productId || null,
+        ambianceId: ambiance.id,
+        thumbUrl: ambiance.thumbUrl,
+        audioUrl: ambiance.audioUrl,
+        duration: ambiance.duration
       }
-    }
-
-    const paidAmbiances = stripeItems.filter(i => i.type === 'ambiance');
-    if (paidAmbiances.length > 0) {
-      const prices = calculateAmbiancePriceDistribution(paidAmbiances.length);
-      for (let i = 0; i < paidAmbiances.length; i++) {
-        const item = paidAmbiances[i];
-        item.price = prices[i] || 0;
-        item.metadata = {
-          ...(item.metadata || {}),
-          ambianceBundleApplied: true,
-          ambianceBundleCount: paidAmbiances.length,
-          ambianceBundlePrice: prices[i] || 0
-        };
-      }
-    }
-
-    const hasSkyMap = stripeItems.some(i => i.type === 'sky_map');
-    const hasPhoto = stripeItems.some(i => i.type === 'photo') || bonusPhotoItems.some(i => i.type === 'bonus_photo');
-    const bonusAmbianceCount = (hasSkyMap ? 1 : 0) + (hasPhoto ? 1 : 0);
-    const bonusAmbianceItems = [];
-    if (bonusAmbianceCount > 0) {
-      const paidAmbianceKeys = paidAmbiances
-        .map(i => extractAmbianceKeyFromMetadata(i.metadata || {}))
-        .filter(Boolean);
-      const seed = JSON.stringify({
-        orderContext: userId || customerEmail || 'guest',
-        paidAmbianceCount: paidAmbiances.length,
-        hasSkyMap,
-        hasPhoto,
-        sourceItems: stripeItems.map(i => ({ type: i.type, title: i.title, productId: i.productId || '' }))
-      });
-      const selectedBonus = selectBonusAmbiances({
-        count: bonusAmbianceCount,
-        excludedKeys: paidAmbianceKeys,
-        seed
-      });
-      const sources = [];
-      if (hasSkyMap) sources.push('card');
-      if (hasPhoto) sources.push('photo');
-      selectedBonus.forEach((bonus, idx) => {
-        const source = sources[idx] || 'bonus';
-        bonusAmbianceItems.push({
-          productId: `bonus_ambiance_${bonus.ambianceId}_${idx}`,
-          type: 'bonus_ambiance',
-          title: source === 'card'
-            ? `Ambiance offerte (Carte): ${bonus.title}`
-            : source === 'photo'
-              ? `Ambiance offerte (Photo): ${bonus.title}`
-              : `Ambiance offerte: ${bonus.title}`,
-          price: 0,
-          quantity: 1,
-          isBonus: true,
-          metadata: {
-            ambianceId: bonus.ambianceId,
-            backgroundImageUrl: bonus.backgroundImageUrl,
-            bonusSource: source
-          }
-        });
-      });
-    }
-
-    const allItems = [
-      ...stripeItems.map(i => ({ ...i, quantity: i.quantity || 1 })),
-      ...bonusPhotoItems.map(i => ({ ...i, price: 0, quantity: 1, isBonus: true })),
-      ...bonusAmbianceItems
-    ];
-
-    const subtotal = stripeItems.reduce((s, i) => s + i.price * (i.quantity || 1), 0);
-    const taxes = Math.round(subtotal * TAX_RATE);
-    const total = subtotal + taxes;
-    console.log('[checkout][debug] totals', {
-      subtotal,
-      taxes,
-      total,
-      stripeItems: stripeItems.map(i => ({
-        type: i.type,
-        title: i.title,
-        price: i.price,
-        quantity: i.quantity || 1
-      })),
-      bonusPhotoItems: bonusPhotoItems.map(i => ({
-        type: i.type,
-        title: i.title,
-        price: i.price,
-        quantity: i.quantity || 1
-      }))
     });
+  }
 
-    // Creer la commande et recuperer l'ID depuis la meme operation (pas de MAX(id))
-    const insertOrder = await db.prepare(`
-    INSERT INTO orders (user_id, customer_email, customer_name, status, total, free_photo_credit, tenant_id)
-    VALUES (?, ?, ?, 'pending', ?, ?, ?)
+  const allItems = [...paidAndBonusItems, ...bonusAmbianceItems];
+
+  const subtotal = stripeItems.reduce((s, i) => s + i.price * (i.quantity || 1), 0);
+  const taxes = Math.round(subtotal * TAX_RATE);
+  const total = subtotal + taxes;
+
+  // Creer la commande â€” lastInsertRowid maintenant fiable car db.init() a ete await
+  const insertOrder = await db.prepare(`
+    INSERT INTO orders (user_id, customer_email, customer_name, status, total, free_photo_credit)
+    VALUES (?, ?, ?, 'pending', ?, ?)
   `);
-    insertOrder.run(
-      userId,
-      customerEmail,
-      customerName,
-      total,
-      stripeItems.filter(i => i.type === 'sky_map').length,
-      tenantId
-    );
-    const orderId = Number(insertOrder.lastInsertRowid || 0);
-    if (!orderId) {
-      console.error('[checkout] ERREUR: impossible de recuperer orderId apres insertion');
-      return res.status(500).json({ error: 'Erreur interne de creation de commande' });
-    }
+  await insertOrder.run(
+    userId,
+    customerEmail,
+    customerName,
+    total,
+    stripeItems.filter(i => i.type === 'sky_map').length
+  );
+  let orderId = Number(insertOrder.lastInsertRowid || 0);
+  if (!orderId) {
+    // Fallback defensif si lastInsertRowid est indisponible.
+    const idStmt = await db.prepare('SELECT MAX(id) as id FROM orders');
+    const idRow = idStmt.get();
+    orderId = Number(idRow?.id || 0);
+  }
+  if (!orderId) {
+    console.error('[checkout] ERREUR: impossible de recuperer orderId apres insertion');
+    return res.status(500).json({ error: 'Erreur interne de creation de commande' });
+  }
 
-    // Inserer les items avec l'orderId nouvellement cree
+  // Inserer les items
+  for (const item of allItems) {
     const insertItem = await db.prepare(`
-    INSERT INTO order_items (order_id, product_type, product_title, price, is_bonus, metadata)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `);
-    for (const item of allItems) {
-      insertItem.run(
-        orderId,
-        item.type,
-        item.title,
-        item.price,
-        item.isBonus ? 1 : 0,
-        JSON.stringify(item.metadata || {})
-      );
-    }
-
-    // Session Stripe
-    const { sessionId, url, mock } = await createCheckoutSession(
-      allItems.map(i => ({
-        productId: i.productId,
-        type: i.type,
-        title: i.title,
-        price: i.price,
-        quantity: i.quantity || 1,
-        metadata: i.metadata
-      })),
-      `${BASE_URL}/success?order_id=${orderId}`,
-      `${BASE_URL}/cancel`,
-      customerEmail,
-      taxes
+      INSERT INTO order_items (order_id, product_type, product_title, price, is_bonus, metadata)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `);
+    await insertItem.run(
+      orderId,
+      item.type,
+      item.title,
+      item.price,
+      item.isBonus ? 1 : 0,
+      JSON.stringify(item.metadata || {})
     );
+  }
 
-    const upd = await db.prepare('UPDATE orders SET stripe_session_id = ? WHERE id = ?');
-    await upd.run(sessionId, orderId);
+  // Session Stripe
+  const { sessionId, url, mock } = await createCheckoutSession(
+    allItems.map(i => ({
+      productId: i.productId,
+      type: i.type,
+      title: i.title,
+      price: i.price,
+      quantity: i.quantity || 1,
+      metadata: i.metadata
+    })),
+    `${BASE_URL}/success?order_id=${orderId}`,
+    `${BASE_URL}/cancel`,
+    customerEmail,
+    taxes
+  );
 
-    return res.json({ orderId, sessionId, url, mock, subtotal, taxes, total });
+  const upd = await db.prepare('UPDATE orders SET stripe_session_id = ? WHERE id = ?');
+  await upd.run(sessionId, orderId);
+
+  res.json({ orderId, sessionId, url, mock, subtotal, taxes, total });
   } catch (err) {
-    console.error('[checkout] Echec creation checkout:', err && err.stack ? err.stack : err.message);
+    console.error('[checkout] Echec creation checkout:', err && err.stack ? err.stack : err);
     return res.status(500).json({ error: 'Echec creation checkout. Reessayez dans quelques secondes.' });
   }
 }
@@ -533,8 +420,6 @@ async function createCheckout(req, res) {
 
 async function checkStatus(req, res) {
   const { session_id, order_id } = req.query;
-  const tenantId = req.tenantId || req.session?.tenantId || DEFAULT_TENANT_ID;
-  const sessionUserId = req.session?.userId != null ? Number(req.session.userId) : null;
   let finalizationPending = false;
 
   if (!session_id && !order_id) {
@@ -560,18 +445,6 @@ async function checkStatus(req, res) {
   if (!order) {
     return res.status(404).json({ error: 'Commande non trouvee' });
   }
-  if ((order.tenant_id || DEFAULT_TENANT_ID) !== tenantId) {
-    return res.status(404).json({ error: 'Commande non trouvee' });
-  }
-
-  // Controle d'acces strict: un order user doit appartenir a la session,
-  // un order invite ne peut etre interroge que via son session_id Stripe.
-  const orderUserId = order.user_id != null ? Number(order.user_id) : null;
-  const isOwner = orderUserId != null && sessionUserId != null && orderUserId === sessionUserId;
-  const isGuestSessionMatch = orderUserId == null && !!session_id && order.stripe_session_id === session_id;
-  if (!isOwner && !isGuestSessionMatch) {
-    return res.status(404).json({ error: 'Commande non trouvee' });
-  }
 
   // Verifier et finaliser si necessaire
   if (session_id) {
@@ -593,13 +466,7 @@ async function checkStatus(req, res) {
         if (order.status === 'paid' && tokenCount >= itemCount) {
           break;
         }
-        await runFinalizeOrderWorkflow({
-          orderId: order.id,
-          userId: order.user_id,
-          tenantId,
-          correlationId: req.headers['x-request-id'] || req.headers['x-correlation-id'] || '',
-          source: attempt === 1 ? 'checkout_status' : 'checkout_status_retry'
-        });
+        await finalizeOrder(order.id, order.user_id);
         const s2 = await db.prepare('SELECT * FROM orders WHERE id = ?');
         order = s2.get(order.id);
         if (order?.status === 'paid') break;
@@ -745,10 +612,16 @@ async function finalizeOrder(orderId, userId) {
       }
 
       const meta = JSON.parse(item.metadata || '{}');
+      if (item.product_type === 'ambiance' || item.product_type === 'bonus_ambiance') {
+        const resolvedAudioPath = resolveAmbianceAudioPath(meta.audioUrl);
+        if (resolvedAudioPath && fs.existsSync(resolvedAudioPath)) {
+          meta.audioPath = resolvedAudioPath;
+        }
+      }
       const updItem = await db.prepare('UPDATE order_items SET metadata = ? WHERE id = ?');
       await updItem.run(JSON.stringify({ ...meta, downloadToken: token }), item.id);
     } catch (e) {
-      console.error(`[Order ${orderId}] Erreur finalize media (${item.product_type}): ${e.message}`);
+      console.error(`[Order ${orderId}] Erreur finalize photo: ${e.message}`);
       hasFailure = true;
     }
   }
@@ -820,14 +693,9 @@ async function downloadFile(req, res) {
 
   // Acces par lien tokenise: pas de session requise (email/partage client).
   // La securite repose sur l'entropie du token + expiration + (optionnellement) usage unique en production.
-  const markTokenUsed = async () => {
-    try {
-      const updTok = await db.prepare('UPDATE download_tokens SET used = 1 WHERE token = ?');
-      await updTok.run(token);
-    } catch (err) {
-      console.error(`[downloadFile] Echec marquage token utilise (${tokenRecord.token}):`, err.message);
-    }
-  };
+
+  const updTok = await db.prepare('UPDATE download_tokens SET used = 1 WHERE token = ?');
+  await updTok.run(token);
 
   let item = null;
   if (tokenRecord.order_item_id) {
@@ -854,20 +722,25 @@ async function downloadFile(req, res) {
     const imagePath = meta.imagePath || null;
     if (imagePath && fs.existsSync(imagePath)) {
       console.log(`[downloadFile] Item ${item.id}: PNG client ${imagePath}`);
-      return res.download(imagePath, 'carte-du-ciel.png', (err) => {
-        if (err) {
-          console.error(`[downloadFile] Echec livraison sky_map item ${item.id} (token ${tokenRecord.token}):`, err.message);
-          if (!res.headersSent) return res.status(500).json({ error: 'Echec du telechargement' });
-          return;
-        }
-        markTokenUsed();
-      });
+      return res.download(imagePath, 'carte-du-ciel.png');
     }
     return res.status(503).json({ error: 'PNG final non disponible pour cette carte.' });
   }
-  // === photo / ambiance ===
-  const resolvedMetaPath = resolveFilePathFromMetadata(item, meta, STORAGE_PATH);
-  let filePath = resolvedMetaPath || meta.pdfPath || meta.imagePath;
+
+  // === ambiance ===
+  if (item.product_type === 'ambiance' || item.product_type === 'bonus_ambiance') {
+    const audioPath = (meta.audioPath && fs.existsSync(meta.audioPath))
+      ? meta.audioPath
+      : resolveAmbianceAudioPath(meta.audioUrl);
+    if (!audioPath || !fs.existsSync(audioPath)) {
+      console.warn('[download ambiance] introuvable', meta.audioUrl);
+      return res.status(404).json({ error: 'Fichier ambiance non disponible' });
+    }
+    return res.download(audioPath, path.basename(audioPath));
+  }
+
+  // === photo ===
+  let filePath = meta.pdfPath || meta.imagePath;
   if (!filePath && (item.product_type === 'photo' || item.product_type === 'bonus_photo')) {
     filePath = gallery.getFullPath(meta.photoId);
   }
@@ -877,14 +750,7 @@ async function downloadFile(req, res) {
   }
 
   const fileName = path.basename(filePath);
-  return res.download(filePath, fileName, (err) => {
-    if (err) {
-      console.error(`[downloadFile] Echec livraison item ${item.id} (token ${tokenRecord.token}):`, err.message);
-      if (!res.headersSent) return res.status(500).json({ error: 'Echec du telechargement' });
-      return;
-    }
-    markTokenUsed();
-  });
+  res.download(filePath, fileName);
 }
 
 // ============================================================
@@ -893,12 +759,11 @@ async function downloadFile(req, res) {
 
 async function listForUser(req, res) {
   if (!req.session.userId) return res.status(401).json({ error: 'Non connecte' });
-  const tenantId = req.tenantId || req.session?.tenantId || DEFAULT_TENANT_ID;
 
   const s1 = await db.prepare(`
-    SELECT * FROM orders WHERE user_id = ? AND tenant_id = ? ORDER BY created_at DESC
+    SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC
   `);
-  const orders = s1.all(req.session.userId, tenantId);
+  const orders = s1.all(req.session.userId);
 
   const result = await Promise.all(orders.map(async (order) => {
     const s2 = await db.prepare('SELECT * FROM order_items WHERE order_id = ?');
@@ -947,9 +812,8 @@ async function listForUser(req, res) {
 
 async function getOne(req, res) {
   if (!req.session.userId) return res.status(401).json({ error: 'Non connecte' });
-  const tenantId = req.tenantId || req.session?.tenantId || DEFAULT_TENANT_ID;
-  const s1 = await db.prepare('SELECT * FROM orders WHERE id = ? AND tenant_id = ?');
-  const order = s1.get(parseInt(req.params.id, 10), tenantId);
+  const s1 = await db.prepare('SELECT * FROM orders WHERE id = ?');
+  const order = s1.get(parseInt(req.params.id, 10));
   if (!order) return res.status(404).json({ error: 'Commande non trouvee' });
   if (order.user_id !== req.session.userId) {
     const s2 = await db.prepare('SELECT is_admin FROM users WHERE id = ?');
@@ -1070,6 +934,16 @@ async function resolveAdminOrderItemFile(item) {
       return { filePath: cleanPath, fileName: 'carte-du-ciel.html', contentType: 'text/html; charset=utf-8' };
     }
     return null;
+  }
+
+  if (item.product_type === 'ambiance' || item.product_type === 'bonus_ambiance') {
+    const filePath = resolveAmbianceAudioPath(meta.audioUrl);
+    if (!filePath || !fs.existsSync(filePath)) return null;
+    return {
+      filePath,
+      fileName: path.basename(filePath),
+      contentType: 'audio/mpeg'
+    };
   }
 
   let filePath = meta.pdfPath || meta.imagePath;
@@ -1211,14 +1085,13 @@ async function saveCardFiles(req, res) {
 
 async function deleteOrder(req, res) {
   if (!req.session.userId) return res.status(401).json({ error: 'Non connecte' });
-  const tenantId = req.tenantId || req.session?.tenantId || DEFAULT_TENANT_ID;
 
   const orderId = parseInt(req.params.id, 10);
   if (!orderId) return res.status(400).json({ error: 'ID invalide' });
 
   // Verifier que l'utilisateur est proprietaire ou admin
-  const sCheck = await db.prepare('SELECT user_id FROM orders WHERE id = ? AND tenant_id = ?');
-  const order = sCheck.get(orderId, tenantId);
+  const sCheck = await db.prepare('SELECT user_id FROM orders WHERE id = ?');
+  const order = sCheck.get(orderId);
   if (!order) return res.status(404).json({ error: 'Commande non trouvee' });
 
   if (order.user_id !== req.session.userId) {
@@ -1253,13 +1126,13 @@ async function deleteOrder(req, res) {
   // Supprimer les items
   await db.run('DELETE FROM order_items WHERE order_id = ?', orderId);
   // Supprimer la commande
-  await db.run('DELETE FROM orders WHERE id = ? AND tenant_id = ?', orderId, tenantId);
+  await db.run('DELETE FROM orders WHERE id = ?', orderId);
 
   res.json({ success: true });
 }
 
 module.exports = {
-  createCheckout, checkStatus, finalizeOrder, runFinalizeOrderWorkflow,
+  createCheckout, checkStatus, finalizeOrder,
   downloadFile, listForUser, getOne,
   listAll, markDelivered, adminStats,
   adminOpenOrderItem, adminDownloadOrderItem,

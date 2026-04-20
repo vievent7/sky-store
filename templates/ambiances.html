@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ambiances sonores - Sky Store</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<nav class="navbar"><div class="nav-inner"><a href="/" class="logo"><img src="/images/sky-store-logo.jpg" alt="Sky Store logo" class="logo-mark">Sky Store</a>
+  <button class="nav-toggle" onclick="document.querySelector('.nav-links').classList.toggle('open')"><svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
+  <div class="nav-links">
+    <a href="/">Accueil</a><a href="/choose-sky">Creer ma carte</a><a href="/gallery">Galerie</a><a href="/ambiances" class="active">Ambiances</a><a href="/cart">Panier <span id="cart-count" class="badge"></span></a><a href="/account" id="nav-account">Mon compte</a>
+  </div>
+</div></nav>
+
+<section class="section" style="padding-top:40px">
+  <div class="container">
+    <div class="section-header" style="margin-bottom:20px">
+      <h2 class="section-title">Ambiances sonores</h2>
+      <p style="color:var(--text-muted);max-width:520px">Bibliothèque de musiques relaxantes</p>
+    </div>
+
+    <div class="card" style="padding:16px 18px;margin-bottom:18px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+        <strong>Selection</strong>
+        <span id="ambiance-counter" style="font-size:.95rem;color:var(--text-muted)">0 / 10</span>
+      </div>
+      <div id="ambiance-selected-items" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px"></div>
+      <div style="display:flex;gap:20px;flex-wrap:wrap;margin-top:14px;font-size:.9rem">
+        <span>1 musique = 1,99 $</span>
+        <span>5 musiques = 7,99 $</span>
+        <span>10 musiques = 9,99 $</span>
+      </div>
+      <div style="margin-top:8px;font-size:1rem">Prix actuel: <strong id="ambiance-price">0.00 $</strong></div>
+      <button id="ambiance-add-selection-cart" class="btn btn-primary" style="margin-top:12px" disabled>Ajouter la selection au panier</button>
+    </div>
+
+    <div id="ambiance-grid" class="photo-grid"></div>
+  </div>
+</section>
+
+<footer><div class="container footer-inner"><div class="footer-brand"><strong>Sky Store</strong><p>Vos cartes du ciel personnalisees</p></div>
+  <div class="footer-links"><a href="/">Accueil</a><a href="/choose-sky">Creer ma carte</a><a href="/gallery">Galerie</a><a href="/ambiances">Ambiances</a><a href="/cgu">CGU</a><a href="/privacy">Confidentialite</a><a href="/account">Mon compte</a></div>
+  <div class="footer-legal"><small>&copy; 2026 Sky Store. Tous droits reserves.</small></div></div></footer>
+<script src="/js/app.js"></script>
+</body>
+</html>

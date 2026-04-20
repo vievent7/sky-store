@@ -8,9 +8,8 @@
     "dev": "node --watch server.js",
     "scan-photos": "node scripts/scan-photos.js",
     "check:production-readiness": "node scripts/production-readiness-check.js",
-    "check:go-live-proof": "node scripts/go-live-proof-check.js",
-    "admin:reset-password": "node scripts/reset-admin-password.js",
-    "reset:test-env": "node scripts/reset-test-environment.js"
+    "reset:test-env": "node scripts/reset-test-environment.js",
+    "deploy:render-and-verify": "node scripts/deploy-and-verify.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

@@ -10,34 +10,9 @@ const { v4: uuidv4 } = require('uuid');
 const { db } = require('../services/database');
 const { mergeSessionCartToDb } = require('./cart');
 const { sendEmail, verifyEmailTemplate, resetPasswordTemplate } = require('../services/email-service');
-const { DEFAULT_TENANT_ID, normalizeTenantId } = require('../services/tenant-context');
 
 const SALT_ROUNDS = 10;
 const VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
-const ADMIN_BOOTSTRAP_EMAIL = String(process.env.ADMIN_BOOTSTRAP_EMAIL || 'vievent7@hotmail.com').trim().toLowerCase();
-const REQUIRE_BOOTSTRAP_ADMIN_SIGNUP = String(process.env.REQUIRE_BOOTSTRAP_ADMIN_SIGNUP || '').trim().toLowerCase() === 'true';
-
-function getTenantIdFromReq(req) {
-  return normalizeTenantId(req?.tenantId || req?.session?.tenantId) || DEFAULT_TENANT_ID;
-}
-
-function regenerateSession(req) {
-  return new Promise((resolve, reject) => {
-    req.session.regenerate((err) => {
-      if (err) return reject(err);
-      resolve();
-    });
-  });
-}
-
-function destroySession(req) {
-  return new Promise((resolve, reject) => {
-    req.session.destroy((err) => {
-      if (err) return reject(err);
-      resolve();
-    });
-  });
-}
 
 function getBaseUrl() {
   return process.env.BASE_URL || `http://localhost:${process.env.PORT || 3000}`;
@@ -63,33 +38,23 @@ async function issueVerificationEmail({ userId, email, name }) {
 // ============================================================
 
 async function register(req, res) {
-  const { email, password, name } = req.body;
+  const { email, password, name, confirmPassword } = req.body;
   const normalizedEmail = String(email || '').trim().toLowerCase();
-  const tenantId = getTenantIdFromReq(req);
+  const normalizedConfirm = String(confirmPassword || '');
 
-  if (!email || !password || !name) {
+  if (!email || !password || !name || !normalizedConfirm) {
     return res.status(400).json({ error: 'Tous les champs sont requis' });
+  }
+  if (password !== normalizedConfirm) {
+    return res.status(400).json({ error: 'Les deux mots de passe ne correspondent pas' });
   }
   if (password.length < 6) {
     return res.status(400).json({ error: 'Le mot de passe doit contenir au moins 6 caracteres' });
   }
 
-  let bootstrapAdminSignup = false;
-  if (REQUIRE_BOOTSTRAP_ADMIN_SIGNUP) {
-    // Tant qu'aucun admin verifie n'existe, imposer l'email bootstrap pour le tout premier admin.
-    const adminCountStmt = await db.prepare(
-      'SELECT COUNT(*) as count FROM users WHERE tenant_id = ? AND is_admin = 1 AND email_verified = 1'
-    );
-    const adminCount = Number(adminCountStmt.get(tenantId)?.count || 0);
-    bootstrapAdminSignup = adminCount === 0 && normalizedEmail === ADMIN_BOOTSTRAP_EMAIL;
-    if (adminCount === 0 && !bootstrapAdminSignup) {
-      return res.status(403).json({ error: 'Inscription reservee au compte admin bootstrap' });
-    }
-  }
-
   // Verifier si l'email existe deja
-  const stmt = await db.prepare('SELECT id, name, email_verified FROM users WHERE email = ? AND tenant_id = ?');
-  const existing = stmt.get(normalizedEmail, tenantId);
+  const stmt = await db.prepare('SELECT id, name, email_verified FROM users WHERE email = ?');
+  const existing = stmt.get(normalizedEmail);
   if (existing) {
     if (!existing.email_verified) {
       await issueVerificationEmail({
@@ -97,34 +62,23 @@ async function register(req, res) {
         email: normalizedEmail,
         name: existing.name || name
       });
-      return res.json({ success: true, emailVerificationSent: true, alreadyExistsUnverified: true });
+      return res.status(409).json({
+        error: "Cet email existe deja (compte non verifie). Un nouvel email de verification vient d'etre envoye.",
+        code: 'EMAIL_ALREADY_EXISTS_UNVERIFIED'
+      });
     }
-    return res.status(409).json({
-      error: 'Cet email est deja utilise',
-      code: 'EMAIL_ALREADY_USED',
-      shouldLogin: true
-    });
+    return res.status(409).json({ error: 'Cet email est deja utilise' });
   }
 
   const hash = bcrypt.hashSync(password, SALT_ROUNDS);
   const insert = await db.prepare(
-    'INSERT INTO users (email, password_hash, name, is_admin, email_verified, email_verification_token, email_verification_expires_at, tenant_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+    'INSERT INTO users (email, password_hash, name, is_admin, email_verified, email_verification_token, email_verification_expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
   );
-  const isAdmin = bootstrapAdminSignup ? 1 : 0;
-  const emailVerified = bootstrapAdminSignup ? 1 : 0;
-  await insert.run(normalizedEmail, hash, name, isAdmin, emailVerified, null, null, tenantId);
+  await insert.run(normalizedEmail, hash, name, 0, 0, null, null);
 
   // Recupere l'utilisateur par email
-  const userStmt = await db.prepare('SELECT id, email, name, is_admin, email_verified FROM users WHERE email = ? AND tenant_id = ?');
-  const user = userStmt.get(normalizedEmail, tenantId);
-
-  if (bootstrapAdminSignup) {
-    return res.json({
-      success: true,
-      bootstrapAdminCreated: true,
-      emailVerificationSent: false
-    });
-  }
+  const userStmt = await db.prepare('SELECT id, email, name, is_admin, email_verified FROM users WHERE email = ?');
+  const user = userStmt.get(normalizedEmail);
 
   await issueVerificationEmail({
     userId: user.id,
@@ -142,14 +96,13 @@ async function register(req, res) {
 async function login(req, res) {
   const { email, password } = req.body;
   const normalizedEmail = String(email || '').trim().toLowerCase();
-  const tenantId = getTenantIdFromReq(req);
 
   if (!email || !password) {
     return res.status(400).json({ error: 'Email et mot de passe requis' });
   }
 
-  const stmt = await db.prepare('SELECT * FROM users WHERE email = ? AND tenant_id = ?');
-  const user = stmt.get(normalizedEmail, tenantId);
+  const stmt = await db.prepare('SELECT * FROM users WHERE email = ?');
+  const user = stmt.get(normalizedEmail);
   if (!user) {
     return res.status(401).json({ error: 'Identifiants invalides' });
   }
@@ -163,17 +116,7 @@ async function login(req, res) {
     return res.status(401).json({ error: 'Identifiants invalides' });
   }
 
-  // Rotation d'ID de session apres authentification (anti session fixation).
-  const anonymousCartSnapshot = req.session?.cart
-    ? JSON.parse(JSON.stringify(req.session.cart))
-    : null;
-
-  await regenerateSession(req);
   req.session.userId = user.id;
-  req.session.tenantId = tenantId;
-  if (anonymousCartSnapshot) {
-    req.session.cart = anonymousCartSnapshot;
-  }
 
   // Fusionner le panier de session dans le panier DB de l'utilisateur
   await mergeSessionCartToDb(req);
@@ -192,14 +135,10 @@ async function login(req, res) {
 // LOGOUT
 // ============================================================
 
-async function logout(req, res) {
-  try {
-    await destroySession(req);
-    res.clearCookie('sky.sid');
+function logout(req, res) {
+  req.session.destroy(() => {
     res.json({ success: true });
-  } catch (e) {
-    res.status(500).json({ error: 'Erreur deconnexion' });
-  }
+  });
 }
 
 // ============================================================
@@ -210,28 +149,9 @@ async function me(req, res) {
   if (!req.session.userId) {
     return res.json({ user: null });
   }
-  const tenantId = getTenantIdFromReq(req);
-  const stmt = await db.prepare('SELECT id, email, name, is_admin, created_at, tenant_id FROM users WHERE id = ? AND tenant_id = ?');
-  const user = stmt.get(req.session.userId, tenantId);
-  if (!user) {
-    req.session.destroy(() => {});
-    return res.status(401).json({ user: null });
-  }
-  res.json({ user: user || null, tenantId });
-}
-
-async function validateSession(req, res) {
-  const tenantId = getTenantIdFromReq(req);
-  if (!req.session?.userId) {
-    return res.status(401).json({ valid: false, reason: 'not_authenticated', tenantId });
-  }
-  const stmt = await db.prepare('SELECT id, email, name, is_admin, created_at, tenant_id FROM users WHERE id = ? AND tenant_id = ?');
-  const user = stmt.get(req.session.userId, tenantId);
-  if (!user) {
-    req.session.destroy(() => {});
-    return res.status(401).json({ valid: false, reason: 'session_invalid', tenantId });
-  }
-  return res.json({ valid: true, tenantId, user });
+  const stmt = await db.prepare('SELECT id, email, name, is_admin, created_at FROM users WHERE id = ?');
+  const user = stmt.get(req.session.userId);
+  res.json({ user: user || null });
 }
 
 // ============================================================
@@ -373,7 +293,10 @@ async function resendVerification(req, res) {
 async function resetPassword(req, res) {
   const token = String(req.body.token || '').trim();
   const password = String(req.body.password || '');
+  const confirmPassword = String(req.body.confirmPassword || '');
   if (!token) return res.status(400).json({ error: 'Token manquant' });
+  if (!confirmPassword) return res.status(400).json({ error: 'Confirmation du mot de passe requise' });
+  if (password !== confirmPassword) return res.status(400).json({ error: 'Les deux mots de passe ne correspondent pas' });
   if (password.length < 6) return res.status(400).json({ error: 'Le mot de passe doit contenir au moins 6 caracteres' });
 
   const findStmt = await db.prepare(
@@ -411,7 +334,6 @@ async function adminRequired(req, res, next) {
 
 module.exports = {
   register, login, logout, me,
-  validateSession,
   verifyEmail, resendVerification, forgotPassword, resetPassword,
   adminList, adminGetUser, adminRequired
 };

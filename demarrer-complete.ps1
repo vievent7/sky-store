@@ -1,6 +1,5 @@
 ﻿# Sky Store - Demarrage local stable
-# Objectif: supprimer la dependance au tunnel trycloudflare pour les tests webhook.
-# Le webhook de test est recu localement via Stripe CLI -> localhost.
+# Objectif: eviter la dependance trycloudflare pour les tests webhook.
 
 $ErrorActionPreference = "Continue"
 
@@ -32,7 +31,7 @@ Write-Host "1. Ouvrir un nouveau terminal"
 Write-Host "2. Lancer:"
 Write-Host "   stripe listen --forward-to http://localhost:3000/api/webhook/stripe"
 Write-Host ""
-Write-Host "Option recommandee (.env) pour le readiness check local:"
+Write-Host "Option recommandee (.env) pour les checks locaux:"
 Write-Host "  STRIPE_LOCAL_WEBHOOK_MODE=true"
 Write-Host ""
 Write-Host "Pour arreter plus tard:"

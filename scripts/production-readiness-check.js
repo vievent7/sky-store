@@ -1,4 +1,4 @@
-'use strict';
+﻿'use strict';
 
 require('dotenv').config();
 
@@ -52,9 +52,7 @@ function runChecks() {
     results,
     !!sessionSecret && !hasPlaceholder(sessionSecret) && sessionSecret.length >= 32,
     'SESSION_SECRET fort',
-    sessionSecret
-      ? `Longueur detectee: ${sessionSecret.length} caracteres`
-      : 'SESSION_SECRET manquant'
+    sessionSecret ? `Longueur detectee: ${sessionSecret.length} caracteres` : 'SESSION_SECRET manquant'
   );
 
   pushResult(
@@ -66,13 +64,7 @@ function runChecks() {
   );
 
   if (localWebhookMode) {
-    pushResult(
-      results,
-      true,
-      'Webhook local Stripe CLI actif',
-      `Forward cible: ${localWebhookBaseUrl}/api/webhook/stripe`,
-      'warn'
-    );
+    pushResult(results, true, 'Webhook local Stripe CLI actif', `Forward cible: ${localWebhookBaseUrl}/api/webhook/stripe`, 'warn');
   } else {
     pushResult(
       results,
@@ -103,31 +95,19 @@ function runChecks() {
       stripeWebhookSecret ? 'STRIPE_WEBHOOK_SECRET configure' : 'STRIPE_WEBHOOK_SECRET manquant'
     );
   } else {
-    pushResult(
-      results,
-      true,
-      'Mode Stripe',
-      'MOCK_STRIPE=true (simulation active)',
-      'warn'
-    );
+    pushResult(results, true, 'Mode Stripe', 'MOCK_STRIPE=true (simulation active)', 'warn');
   }
 
   pushResult(
     results,
     !!sendgridApiKey || !!smtpHost,
     'Provider email configure',
-    sendgridApiKey ? 'SendGrid active' : (smtpHost ? 'SMTP actif' : 'Aucun provider configure'),
+    sendgridApiKey ? 'SendGrid actif' : (smtpHost ? 'SMTP actif' : 'Aucun provider configure'),
     isProd ? 'error' : 'warn'
   );
 
   if (localWebhookMode) {
-    pushResult(
-      results,
-      true,
-      'Webhook URL stable (mode local)',
-      'Mode local Stripe CLI: aucune dependance trycloudflare',
-      'warn'
-    );
+    pushResult(results, true, 'Webhook URL stable (mode local)', 'Mode local Stripe CLI: aucune dependance trycloudflare', 'warn');
   } else {
     pushResult(
       results,
@@ -148,18 +128,13 @@ function runChecks() {
 }
 
 function formatAndExit(report) {
-  const statusIcon = (ok, severity) => {
-    if (ok) return 'PASS';
-    return severity === 'warn' ? 'WARN' : 'FAIL';
-  };
+  const statusIcon = (ok, severity) => ok ? 'PASS' : (severity === 'warn' ? 'WARN' : 'FAIL');
 
   console.log('Sky Store - Production readiness check');
   console.log(`NODE_ENV=${report.nodeEnv}`);
   console.log(`MOCK_STRIPE=${report.mockStripe}`);
   console.log(`STRIPE_LOCAL_WEBHOOK_MODE=${report.localWebhookMode}`);
-  if (report.webhookUrl) {
-    console.log(`Webhook attendu: ${report.webhookUrl}`);
-  }
+  if (report.webhookUrl) console.log(`Webhook attendu: ${report.webhookUrl}`);
   console.log('');
 
   let hasError = false;
@@ -167,9 +142,7 @@ function formatAndExit(report) {
     const icon = statusIcon(item.ok, item.severity);
     console.log(`[${icon}] ${item.label}`);
     console.log(`       ${item.detail}`);
-    if (!item.ok && item.severity !== 'warn') {
-      hasError = true;
-    }
+    if (!item.ok && item.severity !== 'warn') hasError = true;
   }
 
   console.log('');

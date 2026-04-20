@@ -103,61 +103,14 @@ data/photos-meta.json
 | Variable | Description | Defaut |
 |---|---|---|
 | `PORT` | Port du serveur | `3000` |
-| `SESSION_SECRET` | Secret pour les sessions | _(obligatoire, sans fallback)_ |
-| `CORS_ALLOWED_ORIGINS` | Origines CORS autorisees (CSV) | `http://localhost:3000,http://127.0.0.1:3000` |
+| `SESSION_SECRET` | Secret pour les sessions | `dev_secret...` |
 | `STRIPE_PUBLISHABLE_KEY` | Cle publique Stripe | _(absent = mode test)_ |
 | `STRIPE_SECRET_KEY` | Cle privee Stripe | _(absent = mode test)_ |
-| `STRIPE_WEBHOOK_SECRET` | Secret de signature webhook Stripe | _(absent = mode test)_ |
-| `STRIPE_WEBHOOK_PUBLIC_BASE_URL` | URL publique stable pour Stripe webhooks | `BASE_URL` |
 | `STRIPE_MODE` | `test` ou `production` | `test` |
 | `GEOCODE_API_KEY` | Cle API geocodage | _(absent = mode mock)_ |
 | `SENDGRID_API_KEY` | Cle SendGrid | _(absent = mode test)_ |
 | `SMTP_HOST` | Serveur SMTP | _(absent = mode test)_ |
-| `DEFAULT_TENANT_ID` | Tenant par defaut | `public` |
-| `REQUIRE_BOOTSTRAP_ADMIN_SIGNUP` | Verrouille la 1ere inscription sur `ADMIN_BOOTSTRAP_EMAIL` | `false` |
-| `ENABLE_SUBDOMAIN_TENANT` | Active le tenant via sous-domaine | `false` |
-
----
-
-## Recuperation acces admin (3 etapes)
-
-Contexte: en environnement tunnel (`*.trycloudflare.com`), le sous-domaine pouvait etre interprete comme tenant et provoquer un faux "Identifiants invalides".
-
-1. Verifiez dans `.env`:
-   - `DEFAULT_TENANT_ID=public`
-   - `ENABLE_SUBDOMAIN_TENANT=false` (single-tenant recommande)
-2. Redemarrez le serveur (`npm start`).
-3. Si le mot de passe admin reste inconnu, reinitialisez-le sans l'ecrire dans un ticket:
-   ```bash
-   ADMIN_EMAIL=<email-admin> ADMIN_NEW_PASSWORD=<nouveau-secret-fort> npm run admin:reset-password
-   ```
-   Ou (compatible PowerShell / Windows):
-   ```powershell
-   npm run admin:reset-password -- --email "<email-admin>" --password "<nouveau-secret-fort>"
-   ```
-
-Notes securite:
-- Le secret ne doit pas etre publie dans les commentaires/tickets.
-- Le script exige un mot de passe de 12 caracteres minimum et ne fonctionne que pour un compte admin existant.
-
-## Bootstrap admin (inscription initiale)
-
-- Si `REQUIRE_BOOTSTRAP_ADMIN_SIGNUP=true`: tant qu'aucun admin **verifie** n'existe sur le tenant, seule l'adresse `ADMIN_BOOTSTRAP_EMAIL` peut s'inscrire.
-- Le tout premier compte bootstrap est cree admin et verifie immediatement.
-- Configurez `ADMIN_BOOTSTRAP_EMAIL` dans `.env` avant la premiere inscription (quand le verrou bootstrap est actif).
-
-## Reset environnement TEST
-
-Pour nettoyer les utilisateurs/commandes/fichiers generes de test:
-
-```bash
-npm run reset:test-env -- --tenant public --yes
-```
-
-Options utiles:
-- `--drop-bootstrap-admin` : supprime aussi le compte admin bootstrap.
-- `--keep-files` : garde les fichiers deja generes dans `storage/`.
-- Le script affiche explicitement `ATTENTION: compte bootstrap conserve (...)` quand l'email bootstrap est preserve. Dans ce cas, cet email restera indisponible a la re-inscription tant que `--drop-bootstrap-admin` n'est pas passe.
+| `ADMIN_CODE` | Code d'acces admin | _(defaut: `admin123`)_ |
 
 ---
 
@@ -170,22 +123,11 @@ Options utiles:
 
 ### Mode production
 1. Remplacez `STRIPE_SECRET_KEY` et `STRIPE_PUBLISHABLE_KEY` par vos cles Stripe reelles.
-2. Configurez `STRIPE_WEBHOOK_SECRET`.
-3. Configurez `STRIPE_WEBHOOK_PUBLIC_BASE_URL` avec une URL HTTPS stable (eviter `trycloudflare.com`).
-4. Configurez `SENDGRID_API_KEY` ou `SMTP_*` pour les emails.
-5. Configurez `GEOCODE_API_KEY` (ex: Nominatim ou Google Maps) pour le geocodage.
-6. Changez `SESSION_SECRET` par une longue chaine aleatoire (32+ caracteres).
-7. Definissez `CORS_ALLOWED_ORIGINS` avec les domaines front attendus (CSV).
-8. Passez `NODE_ENV=production`.
-9. Lancez:
-   ```bash
-   npm run check:production-readiness
-   ```
-
-### Regle de securite secrets
-- Ne jamais poster de cles Stripe/SMTP/SendGrid en clair dans des tickets, chats ou captures.
-- Utiliser uniquement `.env` local (ignore par git) et le gestionnaire de secrets de la plateforme cible.
-- En cas d'exposition d'une cle: rotation immediate + invalider l'ancienne.
+2. Configurez `SENDGRID_API_KEY` ou `SMTP_*` pour les emails.
+3. Configurez `GEOCODE_API_KEY` (ex: Nominatim ou Google Maps) pour le geocodage.
+4. Changez `SESSION_SECRET` par une longue chaine aleatoire.
+5. Changez `ADMIN_CODE`.
+6. Passez `NODE_ENV=production`.
 
 ---
 
