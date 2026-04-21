@@ -23,6 +23,15 @@ const PHOTOS_DIR = path.join(__dirname, '..', 'public', 'images-astro');
 const THUMBS_DIR = path.join(process.env.STORAGE_PATH || path.join(__dirname, '..', 'storage'), 'thumbnails');
 const META_FILE  = path.join(__dirname, '..', 'data', 'photos-meta.json');
 const DEFAULT_PHOTO_PRICE = 1000; // 10$ CAD
+const NODE_ENV = String(process.env.NODE_ENV || 'development').toLowerCase();
+
+function shouldGenerateThumbsByDefault() {
+  const env = String(process.env.GALLERY_GENERATE_THUMBS_ON_STARTUP || '').trim().toLowerCase();
+  if (env === 'true' || env === '1' || env === 'yes') return true;
+  if (env === 'false' || env === '0' || env === 'no') return false;
+  // In production, avoid long/heavy thumbnail generation during cold start.
+  return NODE_ENV !== 'production';
+}
 
 function normalizePrice(price, fallback = DEFAULT_PHOTO_PRICE) {
   const n = Number(price);
@@ -146,8 +155,9 @@ async function syncPhotos(forceRegenerateThumbs = false) {
       }
     }
 
-    // Generer la miniature si absente ou force
-    if (!fs.existsSync(thumbPath) || forceRegenerateThumbs) {
+    // Generer la miniature si absente/forcee, but avoid heavy cold-start work in production by default.
+    const shouldGenerateThumb = shouldGenerateThumbsByDefault() || forceRegenerateThumbs;
+    if (shouldGenerateThumb && (!fs.existsSync(thumbPath) || forceRegenerateThumbs)) {
       try {
         await generateThumbnail(fullPath, thumbPath);
         console.log(`[Gallery] miniature generee: ${baseName}`);
@@ -194,7 +204,7 @@ function getPhotos(filters = {}) {
     ...p,
     price: normalizePrice(p.price),
     imageUrl: '/images-astro/' + p.filename,
-    thumbUrl: '/api/photos/' + p.id + '/thumb'
+    thumbUrl: '/images-astro/' + p.filename
   }));
 }
 
@@ -207,7 +217,7 @@ function getPhoto(id) {
     ...p,
     price: normalizePrice(p.price),
     imageUrl: '/images-astro/' + p.filename,
-    thumbUrl: '/api/photos/' + p.id + '/thumb'
+    thumbUrl: '/images-astro/' + p.filename
   };
 }
 

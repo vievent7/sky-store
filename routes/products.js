@@ -82,10 +82,14 @@ async function updatePhoto(req, res) {
 
 function serveThumb(req, res) {
   const thumbPath = gallery.getThumbPath(req.params.id);
-  if (!thumbPath || !fs.existsSync(thumbPath)) {
-    return res.status(404).json({ error: 'Miniature non trouvee' });
+  if (thumbPath && fs.existsSync(thumbPath)) {
+    return res.sendFile(thumbPath);
   }
-  res.sendFile(thumbPath);
+  const fullPath = gallery.getFullPath(req.params.id);
+  if (fullPath && fs.existsSync(fullPath)) {
+    return res.sendFile(fullPath);
+  }
+  return res.status(404).json({ error: 'Image non trouvee' });
 }
 
 module.exports = { list, createSkyMapOrder, updatePhoto, serveThumb };
